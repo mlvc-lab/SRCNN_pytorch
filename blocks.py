@@ -30,10 +30,15 @@ class ConvBlock(nn.Module):
             self.act = torch.nn.Sigmoid()
 
     def forward(self, x):
-        if self.activation is not None:
-            return self.act(self.conv(x))
+        if self.norm is not None:
+            out = self.bn(self.conv1(x))
         else:
-            return self.conv(x)
+            self.conv(x)
+        
+        if self.activation is not None:
+            return self.act(out)
+        else:
+            return out
 
 
 class ResnetBlock(torch.nn.Module):
