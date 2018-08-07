@@ -9,7 +9,7 @@ class SRCNN(nn.Module):
 
         self.layers = nn.Sequential(
             ConvBlock(3, 256,  kernel_size=9, padding=4),
-            ConvBlock(256, 128, kernel_size=5, padding=0),
+            ConvBlock(256, 128, kernel_size=5, padding=2),
             ConvBlock(128, 3,  kernel_size=5, padding=2, activation=None))
     
     def forward(self, x):
