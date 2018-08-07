@@ -33,7 +33,7 @@ class ConvBlock(nn.Module):
         if self.norm is not None:
             out = self.bn(self.conv1(x))
         else:
-            self.conv(x)
+            out = self.conv(x)
         
         if self.activation is not None:
             return self.act(out)
