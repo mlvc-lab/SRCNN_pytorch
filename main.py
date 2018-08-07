@@ -46,11 +46,11 @@ criterion = nn.MSELoss()
 
 
 if(use_cuda):
-	srcnn.cuda()
-	criterion = criterion.cuda()
+    srcnn.cuda()
+    criterion = criterion.cuda()
 
-optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
-#optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)
+#optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
+optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)
 
 def train(epoch):
     epoch_loss = 0
@@ -61,7 +61,7 @@ def train(epoch):
             target = target.cuda()
 
         optimizer.zero_grad()
-        model_out = srcnn(input)
+        model_out = srcnn.forward(input)
         loss = criterion(model_out, target)
         epoch_loss += loss.data[0]
         loss.backward()
@@ -82,7 +82,7 @@ def test():
             input = input.cuda()
             target = target.cuda()
 
-        prediction = srcnn(input)
+        prediction = srcnn.forward(input)
         mse = criterion(prediction, target)
         psnr = 10 * log10(1 / mse.data[0])
         avg_psnr += psnr

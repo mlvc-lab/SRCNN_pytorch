@@ -31,7 +31,7 @@ class ConvBlock(nn.Module):
 
     def forward(self, x):
         if self.norm is not None:
-            out = self.bn(self.conv1(x))
+            out = self.bn(self.conv(x))
         else:
             out = self.conv(x)
         
@@ -68,7 +68,6 @@ class ResnetBlock(torch.nn.Module):
             self.act = torch.nn.Tanh()
         elif self.activation == 'sigmoid':
             self.act = torch.nn.Sigmoid()
-
 
     def forward(self, x):
         residual = x
