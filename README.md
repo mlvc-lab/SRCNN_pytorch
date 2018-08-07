@@ -23,4 +23,4 @@ or
 	> python3 run.py --input_image test.jpg --scale_factor 3.0 --model model_epoch_100.pth --cuda --output_filename <output_filename>
 
 # 주의
-	sample에서 input image는 학습에 사용된 BSDS300 data가 아닌 인터넷에서 가져온 이미지 등 다른 이미지를 사용해야 정확한 성능을 확인할 수 있다.
+sample에서 input image는 학습에 사용된 BSDS300 data가 아닌 인터넷에서 가져온 이미지 등 다른 이미지를 사용해야 정확한 성능을 확인할 수 있다.
