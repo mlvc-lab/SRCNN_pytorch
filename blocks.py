@@ -13,11 +13,11 @@ class ConvBlock(nn.Module):
         
         self.activation = activation
         if self.activation == 'relu':
-            self.act = nn.ReLU(True)
+            self.act = nn.ReLU()
         elif self.activation == 'relu6':
             self.act = nn.ReLU6()
         elif self.activation == 'lrelu':
-            self.act = nn.LeakyReLU(0.2, True)
+            self.act = nn.LeakyReLU()
         elif self.activation == 'prelu':
             self.act = nn.PReLU()
         elif self.activation == 'elu':
@@ -28,6 +28,8 @@ class ConvBlock(nn.Module):
             self.act = torch.nn.Tanh()
         elif self.activation == 'sigmoid':
             self.act = torch.nn.Sigmoid()
+        elif self.activation == 'logsigmoid':
+            self.act = torch.nn.LogSigmoid()
 
     def forward(self, x):
         if self.norm is not None:
@@ -53,11 +55,11 @@ class ResnetBlock(torch.nn.Module):
         
         self.activation = activation
         if self.activation == 'relu':
-            self.act = nn.ReLU(True)
+            self.act = nn.ReLU()
         elif self.activation == 'relu6':
             self.act = nn.ReLU6()
         elif self.activation == 'lrelu':
-            self.act = nn.LeakyReLU(0.2, True)
+            self.act = nn.LeakyReLU()
         elif self.activation == 'prelu':
             self.act = nn.PReLU()
         elif self.activation == 'elu':
@@ -68,6 +70,8 @@ class ResnetBlock(torch.nn.Module):
             self.act = torch.nn.Tanh()
         elif self.activation == 'sigmoid':
             self.act = torch.nn.Sigmoid()
+        elif self.activation == 'logsigmoid':
+            self.act = torch.nn.LogSigmoid()
 
 
     def forward(self, x):
