@@ -20,7 +20,6 @@ parser.add_argument('--epochs', type=int, default=2, help='number of epochs to t
 parser.add_argument('--lr', type=float, default=0.01, help='Learning Rate. Default=0.01')
 parser.add_argument('--cuda', action='store_true', help='use cuda?')
 parser.add_argument('--threads', type=int, default=4, help='number of threads for data loader to use')
-# parser.add_argument('--seed', type=int, default=123, help='random seed to use. Default=123')
 opt = parser.parse_args()
 
 print(opt)
@@ -29,10 +28,6 @@ print(opt)
 use_cuda = opt.cuda
 if use_cuda and not torch.cuda.is_available():
     raise Exception("No GPU found, please run without --cuda")
-
-# torch.manual_seed(opt.seed)
-# if use_cuda:
-#     torch.cuda.manual_seed(opt.seed)
 
 
 train_set = get_training_set(opt.upscale_factor)
@@ -49,8 +44,8 @@ if(use_cuda):
 	srcnn.cuda()
 	criterion = criterion.cuda()
 
-optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
-#optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)
+# optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
+optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)
 
 def train(epoch):
     epoch_loss = 0
