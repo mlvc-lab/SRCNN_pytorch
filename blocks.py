@@ -33,7 +33,7 @@ class ConvBlock(nn.Module):
 
     def forward(self, x):
         if self.norm is not None:
-            out = self.bn(self.conv1(x))
+            out = self.bn(self.conv(x))
         else:
             out = self.conv(x)
         
