@@ -41,8 +41,9 @@ criterion = nn.MSELoss()
 
 
 if(use_cuda):
-	srcnn.cuda()
-	criterion = criterion.cuda()
+    torch.cuda.set_device(2)
+    srcnn.cuda()
+    criterion = criterion.cuda()
 
 # optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
 optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)
@@ -61,10 +62,11 @@ def train(epoch):
         epoch_loss += loss.data[0]
         loss.backward()
         optimizer.step()
+	
+        if (iteration % 20) == 1 :
+            print("===> Epoch[{}]({}/{}): Loss: {:.6f}".format(epoch, iteration, len(training_data_loader), loss.data[0]))
 
-        print("===> Epoch[{}]({}/{}): Loss: {:.4f}".format(epoch, iteration, len(training_data_loader), loss.data[0]))
-
-    print("===> Epoch {} Complete: Avg. Loss: {:.4f}".format(epoch, epoch_loss / len(training_data_loader)))
+    print("===> Epoch {} Complete: Avg. Loss: {:.6f}".format(epoch, epoch_loss / len(training_data_loader)))
 
 
 
