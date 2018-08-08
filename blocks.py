@@ -10,7 +10,7 @@ class ConvBlock(nn.Module):
         self.norm = norm
         if self.norm == 'batch':
             self.bn = torch.nn.BatchNorm2d(output_size)
-        
+
         self.activation = activation
         if self.activation == 'relu':
             self.act = nn.ReLU(True)
@@ -34,7 +34,7 @@ class ConvBlock(nn.Module):
             out = self.bn(self.conv1(x))
         else:
             out = self.conv(x)
-        
+
         if self.activation is not None:
             return self.act(out)
         else:
@@ -50,7 +50,7 @@ class ResnetBlock(torch.nn.Module):
         self.norm = norm
         if self.norm == 'batch':
             self.bn = torch.nn.BatchNorm2d(num_filter)
-        
+
         self.activation = activation
         if self.activation == 'relu':
             self.act = nn.ReLU(True)
@@ -69,7 +69,6 @@ class ResnetBlock(torch.nn.Module):
         elif self.activation == 'sigmoid':
             self.act = torch.nn.Sigmoid()
 
-
     def forward(self, x):
         residual = x
         if self.norm is not None:
@@ -87,3 +86,13 @@ class ResnetBlock(torch.nn.Module):
 
         out = torch.add(out, residual)
         return out
+
+
+class Pool(nn.Module):
+    def __init__(self, kernel_size, stride=1, padding=0, method='max'):
+        super(Pool, self).__init__()
+
+        if method == 'max':
+            self.pool = nn.MaxPool2d(kernel_size, stride, padding)
+
+        
