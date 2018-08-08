@@ -41,70 +41,159 @@ training_data_loader = DataLoader(dataset=train_set, num_workers=opt.threads, ba
 testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.test_batch_size, shuffle=False)
 
 
-srcnn = SRCNN()
-criterion = nn.MSELoss()
+for Res in [False,True]:
+    if Res == False:
+        for layer1_size in range(1,8,2):
+            for layer2_size in range(-1,8,2):
+                for layer3_size in range(-1,8,2):
+                    for layer4_size in range(1, 8, 2):
+                        for channel in [8, 16, 32, 64, 128]:
+                            for batchuse in [False, True]:
+
+                                kernel_size=[layer1_size, layer2_size, layer3_size, layer4_size]
+                                srcnn = SRCNN(kernel_size, channel,batchuse, Res)
+                                criterion = nn.MSELoss()
+
+                                if(use_cuda):
+                                    srcnn.cuda()
+                                    criterion = criterion.cuda()
+
+                                optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)
 
 
-if(use_cuda):
-	srcnn.cuda()
-	criterion = criterion.cuda()
+                                def train(epoch):
+                                    epoch_loss = 0
+                                    for iteration, batch in enumerate(training_data_loader, 1):
+                                        input, target = Variable(batch[0]), Variable(batch[1])
+                                        if use_cuda:
+                                            input = input.cuda()
+                                            target = target.cuda()
 
-optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
-#optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)
+                                        optimizer.zero_grad()
+                                        model_out = srcnn(input)
+                                        loss = criterion(model_out, target)
+                                        epoch_loss += loss.data[0]
+                                        loss.backward()
+                                        optimizer.step()
 
-def train(epoch):
-    epoch_loss = 0
-    for iteration, batch in enumerate(training_data_loader, 1):
-        input, target = Variable(batch[0]), Variable(batch[1])
-        if use_cuda:
-            input = input.cuda()
-            target = target.cuda()
+                                        print("===> Epoch[{}]({}/{}): Loss: {:.6f}".format(epoch, iteration, len(training_data_loader), loss.data[0]))
 
-        optimizer.zero_grad()
-        model_out = srcnn(input)
-        loss = criterion(model_out, target)
-        epoch_loss += loss.data[0]
-        loss.backward()
-        optimizer.step()
-
-        print("===> Epoch[{}]({}/{}): Loss: {:.4f}".format(epoch, iteration, len(training_data_loader), loss.data[0]))
-
-    print("===> Epoch {} Complete: Avg. Loss: {:.4f}".format(epoch, epoch_loss / len(training_data_loader)))
+                                    print("===> Epoch {} Complete: Avg. Loss: {:.6f}".format(epoch, epoch_loss / len(training_data_loader)))
 
 
 
 
-def test():
-    avg_psnr = 0
-    for batch in testing_data_loader:
-        input, target = Variable(batch[0]), Variable(batch[1])
-        if use_cuda:
-            input = input.cuda()
-            target = target.cuda()
+                                def test(avg_psnr):
+                                    for batch in testing_data_loader:
+                                        input, target = Variable(batch[0]), Variable(batch[1])
+                                        if use_cuda:
+                                            input = input.cuda()
+                                            target = target.cuda()
 
-        prediction = srcnn(input)
-        mse = criterion(prediction, target)
-        psnr = 10 * log10(1 / mse.data[0])
-        avg_psnr += psnr
-    print("===> Avg. PSNR: {:.4f} dB".format(avg_psnr / len(testing_data_loader)))
+                                        prediction = srcnn(input)
+                                        mse = criterion(prediction, target)
+                                        psnr = 10 * log10(1 / mse.data[0])
+                                        avg_psnr += psnr
+                                        psnr = avg_psnr / len(testing_data_loader)
+                                    print("===> Avg. PSNR: {:.4f} dB".format(psnr))
 
-
-def checkpoint(epoch):
-    try:
-        if not(os.path.isdir('model')):
-            os.makedirs(os.path.join('model'))
-    except OSError as e:
-        if e.errno != errno.EEXIST:
-            print("Failed to create directory!!!!!")
-            raise
-
-    model_out_path = "model/model_epoch_{}.pth".format(epoch)
-    torch.save(srcnn, model_out_path)
-    print("Checkpoint saved to {}".format(model_out_path))
+                                    return psnr
 
 
-for epoch in range(1, opt.epochs + 1):
-    train(epoch)
-    test()
-    if(epoch%10==0):
-        checkpoint(epoch)
+                                def checkpoint(epoch, avg_psnr):
+                                    try:
+                                        if not(os.path.isdir('model')):
+                                            os.makedirs(os.path.join('model'))
+                                    except OSError as e:
+                                        if e.errno != errno.EEXIST:
+                                            print("Failed to create directory!!!!!")
+                                            raise
+
+                                    model_out_path = "model/model_[Conv, BN:{}.channel:{},layer:[{},{},{},{}]]epoch_{}_avg_psnr_{:.4f}dB.pth".format(batchuse,channel,layer1_size,layer2_size,layer3_size,layer4_size,epoch,avg_psnr)
+                                    torch.save(srcnn, model_out_path)
+                                    print("Checkpoint saved to {}".format(model_out_path))
+
+
+                                for epoch in range(1, opt.epochs + 1):
+                                    avg_psnr = 0
+                                    train(epoch)
+                                    avg_psnr = test(avg_psnr)
+                                    if(epoch%20==0):
+                                        checkpoint(epoch, avg_psnr)
+    if Res == True:
+        for layer1_size in range(1,8,2):
+            for layer2_size in range(-1,8,2):
+                for layer3_size in range(-1,8,2):
+                    for channel in [8, 16, 32, 64, 128]:
+                        kernel_size = [layer1_size, layer2_size, layer3_size]
+                        srcnn = SRCNN(kernel_size, channel, batchuse, Res)
+                        criterion = nn.MSELoss()
+
+                        if (use_cuda):
+                            srcnn.cuda()
+                            criterion = criterion.cuda()
+
+                        optimizer = optim.Adam(srcnn.parameters(), lr=opt.lr)
+
+
+                        def train(epoch):
+                            epoch_loss = 0
+                            for iteration, batch in enumerate(training_data_loader, 1):
+                                input, target = Variable(batch[0]), Variable(batch[1])
+                                if use_cuda:
+                                    input = input.cuda()
+                                    target = target.cuda()
+
+                                optimizer.zero_grad()
+                                model_out = srcnn(input)
+                                loss = criterion(model_out, target)
+                                epoch_loss += loss.data[0]
+                                loss.backward()
+                                optimizer.step()
+
+                                print("===> Epoch[{}]({}/{}): Loss: {:.6f}".format(epoch, iteration,
+                                                                                   len(training_data_loader),
+                                                                                   loss.data[0]))
+
+                            print("===> Epoch {} Complete: Avg. Loss: {:.6f}".format(epoch, epoch_loss / len(
+                                training_data_loader)))
+
+
+                        def test(avg_psnr):
+                            for batch in testing_data_loader:
+                                input, target = Variable(batch[0]), Variable(batch[1])
+                                if use_cuda:
+                                    input = input.cuda()
+                                    target = target.cuda()
+
+                                prediction = srcnn(input)
+                                mse = criterion(prediction, target)
+                                psnr = 10 * log10(1 / mse.data[0])
+                                avg_psnr += psnr
+                                psnr = avg_psnr / len(testing_data_loader)
+                            print("===> Avg. PSNR: {:.4f} dB".format(psnr))
+
+                            return psnr
+
+
+                        def checkpoint(epoch, avg_psnr):
+                            try:
+                                if not (os.path.isdir('model')):
+                                    os.makedirs(os.path.join('model'))
+                            except OSError as e:
+                                if e.errno != errno.EEXIST:
+                                    print("Failed to create directory!!!!!")
+                                    raise
+
+                            model_out_path = "model/model_[Res, BN:{}.channel:{},layer:[{},{},{},{}]]epoch_{}_avg_psnr_{:.4f}dB.pth".format(
+                                batchuse, channel, layer1_size, layer2_size, layer3_size, layer4_size, epoch, avg_psnr)
+                            torch.save(srcnn, model_out_path)
+                            print("Checkpoint saved to {}".format(model_out_path))
+
+
+                        for epoch in range(1, opt.epochs + 1):
+                            avg_psnr = 0
+                            train(epoch)
+                            avg_psnr = test(avg_psnr)
+                            if (epoch % 20 == 0):
+                                checkpoint(epoch, avg_psnr)
