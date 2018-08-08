@@ -82,3 +82,13 @@ class ResnetBlock(torch.nn.Module):
 
         out = torch.add(out, residual)
         return out
+
+class Conv_ReLU_Block(nn.Module):
+    def __init__(self):
+            super(Conv_ReLU_Block, self).__init__()
+            self.bn = torch.nn.BatchNorm2d(64)
+            self.conv = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1, padding=1, bias=False)
+            self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+            return self.relu(self.bn(self.conv(x)))
