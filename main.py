@@ -10,7 +10,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from data import get_training_set, get_test_set
-from model import SRCNN
+from model import SRCNN, SRLoss
 
 # set option parameter
 parser = argparse.ArgumentParser(description='PyTorch Super Resolution Example')
@@ -40,7 +40,7 @@ testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batc
 
 # load model and criterion(loss)
 srcnn = SRCNN()
-criterion = nn.MSELoss()
+criterion = SRLoss(0.84)
 
 # set cuda(GPU)
 if (use_cuda):
@@ -75,18 +75,24 @@ def train(epoch):
         optimizer.zero_grad()
         model_out = srcnn(input)
         loss = criterion(model_out, target)
-        epoch_loss += loss.data[0]
+        epoch_loss += loss.item()
         loss.backward()
         optimizer.step()
 
-        if (iteration % 10) == 1:
-            print(
-                "===> Epoch[{}]({}/{}): Loss: {:.6f}".format(epoch, iteration, len(training_data_loader), loss.data[0]))
+        # if (iteration % 10) == 1:
+        #     print(
+        #         "===> Epoch[{}]({}/{}): Loss: {:.6f}"
+        #          .format(epoch, iteration, len(training_data_loader), loss.item()))
 
     print("===> Epoch {} Complete: Avg. Loss: {:.6f}".format(epoch, epoch_loss / len(training_data_loader)))
 
 
 def test():
+    """
+    Test model
+
+    :return: None
+    """
     avg_psnr = 0
     for batch in testing_data_loader:
         input, target = Variable(batch[0]), Variable(batch[1])
@@ -96,12 +102,18 @@ def test():
 
         prediction = srcnn(input)
         mse = criterion(prediction, target)
-        psnr = 10 * log10(1 / mse.data[0])
+        psnr = 10 * log10(1 / mse.item())
         avg_psnr += psnr
-    print("===> Avg. PSNR: {:.4f} dB".format(avg_psnr / len(testing_data_loader)))
+    print("===> Avg. PSNR: {:.6f} dB".format(avg_psnr / len(testing_data_loader)))
 
 
 def checkpoint(epoch):
+    """
+    Save checkpoint name of 'model_epoch_<epoch>.pth' 
+
+    :param epoch: epoch of current trained model
+    :return: None
+    """
     try:
         if not (os.path.isdir('model')):
             os.makedirs(os.path.join('model'))

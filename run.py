@@ -2,7 +2,8 @@ from __future__ import print_function
 from os.path import join
 import argparse
 import torch
-import math
+from scipy import ndimage
+from scipy.misc import imsave
 from torch.autograd import Variable
 from PIL import Image
 
@@ -48,5 +49,12 @@ out_img_cb = cb.resize(out_img_y.size, Image.BICUBIC)
 out_img_cr = cr.resize(out_img_y.size, Image.BICUBIC)
 out_img = Image.merge('YCbCr', [out_img_y, out_img_cb, out_img_cr]).convert('RGB')
 
+# sharpen
+# blurred = ndimage.gaussian_filter(out_img, 3)
+# filter_blurred = ndimage.gaussian_filter(blurred, 1)
+# alpha = 30
+# sharpened = blurred + alpha * (blurred - filter_blurred)
+# 
+# imsave(opt.output_filename, sharpened)
 out_img.save(opt.output_filename)
 print('output image saved to ', opt.output_filename)
