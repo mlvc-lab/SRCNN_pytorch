@@ -11,7 +11,7 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
 
         layers = [ConvBlock(3, 32, kernel_size=5, padding=2), ConvBlock(32, 64, kernel_size=5, padding=2)]
-        for i in range(6):
+        for i in range(7):
             layers.append(ResnetBlock(64))
         layers.append(ConvBlock(64, 3, kernel_size=3, padding=1, activation=None))
         layers.append(ConvBlock(3, 3, kernel_size=1, padding=0, activation=None))
@@ -35,19 +35,19 @@ class Discriminator(nn.Module):
             ConvBlock(128, 128, kernel_size=3, padding=1, norm='batch'),
             Pool(2, 2),
             ConvBlock(128, 256, kernel_size=3, padding=1, norm='batch'),
-            ConvBlock(256, 256, kernel_size=3, padding=1, norm='batch'),
+            ConvBlock(256, 512, kernel_size=3, padding=1, norm='batch'),
             Pool(2, 2),
-            ConvBlock(256, 256, kernel_size=3, padding=1, norm='batch'),
-            ConvBlock(256, 256, kernel_size=3, padding=1, norm='batch'),
+            ConvBlock(512, 512, kernel_size=3, padding=1, norm='batch'),
+            ConvBlock(512, 512, kernel_size=3, padding=1, norm='batch'),
             Pool(2, 2),
         ]
         self.layers = nn.Sequential(*layers)
-        self.l1 = nn.Linear((256 * 7 * 7), 1024)
+        self.l1 = nn.Linear((512 * 7 * 7), 1024)
         self.l2 = nn.Linear(1024, 1)
 
     def forward(self, x):
         x = self.layers(x)
-        x = x.view(-1, 256 * 7 * 7)
+        x = x.view(-1, 512 * 7 * 7)
         x = self.l1(x)
         x = self.l2(x)
         return x
@@ -76,7 +76,7 @@ class SRLoss(nn.Module):
 # Defines the GAN loss which uses either LSGAN or the regular GAN.
 class GANLoss(nn.Module):
     def __init__(self, use_lsgan=True, target_real_label=1.0, target_fake_label=0.0,
-                 tensor=torch.FloatTensor):
+                 tensor=torch.FloatTensor, cuda=True):
         super(GANLoss, self).__init__()
         self.real_label = target_real_label
         self.fake_label = target_fake_label
@@ -87,6 +87,9 @@ class GANLoss(nn.Module):
             self.loss = nn.MSELoss()
         else:
             self.loss = nn.BCELoss()
+
+        if cuda:
+            self.loss = self.loss.cuda()
 
     def get_target_tensor(self, input, target_is_real):
         target_tensor = None

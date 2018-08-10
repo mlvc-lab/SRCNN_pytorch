@@ -39,7 +39,7 @@ if opt.cuda:
     torch.cuda.set_device(opt.gpuids[0])
     with torch.cuda.device(opt.gpuids[0]):
         model = model.cuda()
-        criterion = model.cuda()
+        input = input.cuda()
     model = nn.DataParallel(model, device_ids=opt.gpuids, output_device=opt.gpuids[0])
 model.load_state_dict(torch.load(model_name))
 
@@ -58,12 +58,5 @@ out_img_cb = cb.resize(out_img_y.size, Image.BICUBIC)
 out_img_cr = cr.resize(out_img_y.size, Image.BICUBIC)
 out_img = Image.merge('YCbCr', [out_img_y, out_img_cb, out_img_cr]).convert('RGB')
 
-# sharpen
-# blurred = ndimage.gaussian_filter(out_img, 3)
-# filter_blurred = ndimage.gaussian_filter(blurred, 1)
-# alpha = 30
-# sharpened = blurred + alpha * (blurred - filter_blurred)
-# 
-# imsave(opt.output_filename, sharpened)
 out_img.save(opt.output_filename)
 print('output image saved to ', opt.output_filename)

@@ -85,7 +85,7 @@ def train(epoch):
         if use_cuda:
             input = input.cuda()
             target = target.cuda()
-            target = target - input
+            target = target - input   # residual
 
         # training D
         d_optim.zero_grad()   # grad init
