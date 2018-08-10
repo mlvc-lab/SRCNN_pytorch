@@ -10,7 +10,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from data import get_training_set, get_test_set
-from model import Generator, SRLoss
+from model import Generator, Discriminator, GANLoss
 
 # set option parameter
 parser = argparse.ArgumentParser(description='PyTorch Super Resolution Example')
@@ -42,18 +42,25 @@ testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batc
 
 # load model and criterion(loss)
 generator = Generator()
-criterion = SRLoss(opt.alpha)
-# criterion = nn.MSELoss()
+discriminator = Discriminator()
+criterionGAN = GANLoss()
+criterionL1 = nn.L1Loss()
+criterionMSE = nn.MSELoss()
 
 # set cuda(GPU)
 if use_cuda:
     torch.cuda.set_device(opt.gpuids[0])
     with torch.cuda.device(opt.gpuids[0]):
         generator = generator.cuda()
-        criterion = criterion.cuda()
+        discriminator = discriminator.cuda()
+        criterionGAN = criterionGAN.cuda()
+        criterionL1 = criterionL1.cuda()
+        criterionMSE = criterionMSE.cuda()
     generator = nn.DataParallel(generator, device_ids=opt.gpuids, output_device=opt.gpuids[0])
+    discriminator = nn.DataParallel(discriminator, device_ids=opt.gpuids, output_device=opt.gpuids[0])
 
-optimizer = optim.Adam(generator.parameters(), lr=opt.lr)
+g_optim = optim.Adam(generator.parameters(), betas=(0.5, 0.999), lr=opt.lr)
+d_optim = optim.Adam(discriminator.parameters(), betas=(0.5, 0.999), lr=opt.lr)
 
 
 # train
@@ -67,28 +74,51 @@ def train(epoch):
     """
 
     # epoch loss initialization
-    epoch_loss = 0
+    epoch_d_loss = 0
+    epoch_g_loss = 0
 
     # batch iteration
     for iteration, batch in enumerate(training_data_loader, 1):     # load training data from dataloader
+
+        # set input and target data
         input, target = Variable(batch[0]), Variable(batch[1])
         if use_cuda:
             input = input.cuda()
             target = target.cuda()
+            target = target - input
 
-        optimizer.zero_grad()
-        model_out = generator(input)
-        loss = criterion(model_out, target)
-        epoch_loss += loss.item()
-        loss.backward()
-        optimizer.step()
+        # training D
+        d_optim.zero_grad()   # grad init
+        gen_z = generator(input)    # gen SR image
 
-        # if (iteration % 10) == 1:
-        #     print(
-        #         "===> Epoch[{}]({}/{}): Loss: {:.6f}"
-        #          .format(epoch, iteration, len(training_data_loader), loss.item()))
+        disc_z = discriminator(gen_z.detach())  # disc result of fake image
+        fake_loss = criterionGAN(disc_z, False)  # gan fake loss
 
-    print("===> Epoch {} Complete: Avg. Loss: {:.6f}".format(epoch, epoch_loss / len(training_data_loader)))
+        disc_r = discriminator(target)  # disc result of real image
+        real_loss = criterionGAN(disc_r, True)  # gan real loss
+
+        loss_d = (fake_loss + real_loss) * 0.5
+
+        loss_d.backward()   # update grad
+        d_optim.step()
+
+        epoch_d_loss += loss_d
+
+        # training G
+        g_optim.zero_grad()   # grad init
+        gen_z = generator(input)    # sr
+        disc_z = discriminator(gen_z.detach())
+        loss_g_gan = criterionGAN(disc_z, True)
+        loss_g_l1 = criterionMSE(gen_z.detach(), target)
+
+        loss_g = loss_g_gan + loss_g_l1     # g loss
+        loss_g.backward()   # update grad
+        g_optim.step()
+
+        epoch_g_loss = loss_g
+
+    print("Epoch {}: GLoss: {:.4f} DLoss: {:.4f}"
+          .format(epoch, epoch_g_loss / len(training_data_loader), epoch_d_loss / len(training_data_loader)))
 
 
 def test():
@@ -99,12 +129,14 @@ def test():
     """
     avg_psnr = 0
     for batch in testing_data_loader:
-        input, target = Variable(batch[0]), Variable(batch[1])
+        with torch.no_grad():
+            input, target = Variable(batch[0]), Variable(batch[1])
         if use_cuda:
             input = input.cuda()
             target = target.cuda()
 
         prediction = generator(input)
+        prediction = torch.add(prediction, 1, input)  # residual
         loss = nn.MSELoss()(prediction, target)
         psnr = 10 * log10(1 / loss.item())
         avg_psnr += psnr

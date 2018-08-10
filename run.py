@@ -44,8 +44,9 @@ if opt.cuda:
 model.load_state_dict(torch.load(model_name))
 
 
-out = model(input).cpu()
-# out = out.cpu()
+out = model(input)
+out = torch.add(out, 1, input)      # residual
+out = out.cpu()
 
 print("type = ", type(out))
 out_img_y = out.data[0].numpy()

@@ -145,8 +145,13 @@ class BottleNeckBlock(torch.nn.Module):
 
 
 class Pool(nn.Module):
-    def __init__(self, kernel_size, stride=1, padding=0, method='max'):
+    def __init__(self, kernel_size, stride, padding=0, method='max'):
         super(Pool, self).__init__()
 
         if method == 'max':
             self.pool = nn.MaxPool2d(kernel_size, stride, padding)
+        elif method == 'avg':
+            self.pool = nn.AvgPool2d(kernel_size, stride, padding)
+
+    def forward(self, x):
+        return self.pool(x)
