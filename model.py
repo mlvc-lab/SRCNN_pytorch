@@ -102,4 +102,3 @@ class DRCN(nn.Module):
 
         return pred_label, img_rec
 
-

@@ -11,6 +11,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from data import get_training_set, get_test_set
 from model import SRCNN
+from blocks import ResNet50
 
 parser = argparse.ArgumentParser(description='PyTorch Super Resolution Example')
 parser.add_argument('--upscale_factor', type=int, required=True, help="super resolution upscale factor")
@@ -42,7 +43,7 @@ training_data_loader = DataLoader(dataset=train_set, num_workers=opt.threads, ba
 testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.test_batch_size, shuffle=False)
 
 
-srcnn = SRCNN()
+srcnn = ResNet50()
 criterion = nn.MSELoss()
 
 
