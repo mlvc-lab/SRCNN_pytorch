@@ -10,7 +10,7 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
 
         layers = [ConvBlock(3, 32, kernel_size=5, padding=2), ConvBlock(32, 64, kernel_size=5, padding=2)]
-        for i in range(6):
+        for i in range(8):
             layers.append(ResnetBlock(64))
         layers.append(ConvBlock(64, 3, kernel_size=3, padding=1, activation=None))
         layers.append(ConvBlock(3, 3, kernel_size=1, padding=0, activation=None))

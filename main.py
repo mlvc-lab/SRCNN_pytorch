@@ -75,6 +75,7 @@ def train(epoch):
         if use_cuda:
             input = input.cuda()
             target = target.cuda()
+            target = target - input  # residual learning
 
         optimizer.zero_grad()
         model_out = generator(input)
@@ -105,6 +106,7 @@ def test():
             target = target.cuda()
 
         prediction = generator(input)
+        prediction = torch.add(prediction, 1, input)  # residual learning
         loss = nn.MSELoss()(prediction, target)
         psnr = 10 * log10(1 / loss.item())
         avg_psnr += psnr
