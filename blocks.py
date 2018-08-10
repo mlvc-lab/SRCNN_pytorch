@@ -90,4 +90,73 @@ class ResnetBlock(torch.nn.Module):
             out = self.conv2(out)
 
         out = torch.add(out, residual)
+
+        if self.activation is not None:
+            out = self.act(out)
+
+        return out
+
+
+class BottleneckBlock(torch.nn.Module):
+    def __init__(self, num_filter, kernel_size=3, stride=1, padding=1, activation='relu', norm='batch'):
+        super(BottleneckBlock, self).__init__()
+        self.conv1 = torch.nn.Conv2d(num_filter, num_filter//4, 1, 1, 0)
+        self.conv2 = torch.nn.Conv2d(num_filter//4, num_filter//4, kernel_size, stride, padding)
+        self.conv3 = torch.nn.Conv2d(num_filter//4, num_filter, 1, 1, 0)
+
+        self.norm = norm
+        if self.norm == 'batch':
+            self.bn1 = torch.nn.BatchNorm2d(num_filter//4)
+            self.bn2 = torch.nn.BatchNorm2d(num_filter//4)
+            self.bn3 = torch.nn.BatchNorm2d(num_filter)
+        
+        self.activation = activation
+        if self.activation == 'relu':
+            self.act = nn.ReLU()
+        elif self.activation == 'relu6':
+            self.act = nn.ReLU6()
+        elif self.activation == 'lrelu':
+            self.act = nn.LeakyReLU()
+        elif self.activation == 'prelu':
+            self.act = nn.PReLU()
+        elif self.activation == 'elu':
+            self.act = nn.ELU()
+        elif self.activation == 'selu':
+            self.act = nn.SELU()
+        elif self.activation == 'tanh':
+            self.act = torch.nn.Tanh()
+        elif self.activation == 'sigmoid':
+            self.act = torch.nn.Sigmoid()
+        elif self.activation == 'logsigmoid':
+            self.act = torch.nn.LogSigmoid()
+
+
+    def forward(self, x):
+        residual = x
+        if self.norm is not None:
+            out = self.bn1(self.conv1(x))
+        else:
+            out = self.conv1(x)
+
+        if self.activation is not None:
+            out = self.act(out)
+
+        if self.norm is not None:
+            out = self.bn2(self.conv2(out))
+        else:
+            out = self.conv2(out)
+
+        if self.activation is not None:
+            out = self.act(out)
+
+        if self.norm is not None:
+            out = self.bn3(self.conv3(out))
+        else:
+            out = self.conv3(out)
+
+        out = torch.add(out, residual)
+
+        if self.activation is not None:
+            out = self.act(out)
+
         return out

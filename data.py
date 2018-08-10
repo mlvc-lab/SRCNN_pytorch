@@ -2,7 +2,8 @@ from os.path import exists, join, basename
 from os import makedirs, remove
 from six.moves import urllib
 import tarfile
-from torchvision.transforms import Compose, CenterCrop, ToTensor, Scale
+import PIL
+from torchvision.transforms import Compose, CenterCrop, ToTensor, Resize
 
 from data_utils import DatasetFromFolder
 
@@ -38,7 +39,8 @@ def calculate_valid_crop_size(crop_size, upscale_factor):
 def input_transform(crop_size, upscale_factor):
     return Compose([
         CenterCrop(crop_size),
-        Scale(crop_size),
+        Resize(crop_size//upscale_factor, PIL.Image.BICUBIC),
+        Resize(crop_size, PIL.Image.LANCZOS),
         ToTensor(),
     ])
 
