@@ -20,6 +20,7 @@ parser.add_argument('--epochs', type=int, default=2, help='number of epochs to t
 parser.add_argument('--lr', type=float, default=0.01, help='Learning Rate. Default=0.01')
 parser.add_argument('--cuda', action='store_true', help='use cuda?')
 parser.add_argument('--threads', type=int, default=4, help='number of threads for data loader to use')
+parser.add_argument('--gpuid', default=0, type=int, help='GPU ID for using')
 opt = parser.parse_args()
 
 print(opt)
@@ -41,8 +42,9 @@ criterion = nn.MSELoss()
 
 
 if(use_cuda):
-	srcnn.cuda()
-	criterion = criterion.cuda()
+    torch.cuda.set_device(opt.gpuid)
+    srcnn.cuda()
+    criterion = criterion.cuda()
 
 # optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
 optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)
