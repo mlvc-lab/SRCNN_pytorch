@@ -48,8 +48,8 @@ criterion = nn.MSELoss()
 
 if(use_cuda):
     torch.cuda.set_device(opt.gpuid)
-	srcnn.cuda()
-	criterion = criterion.cuda()
+    srcnn.cuda()
+    criterion = criterion.cuda()
 
 optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
 #optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)
