@@ -21,9 +21,11 @@ parser.add_argument('--epochs', type=int, default=100, help='number of epochs to
 parser.add_argument('--lr', type=float, default=0.001, help='Learning Rate. Default=0.01')
 parser.add_argument('--cuda', action='store_true', help='use cuda?')
 parser.add_argument('--threads', type=int, default=16, help='number of threads for data loader to use')
-parser.add_argument('--gpuid', default=0, type=int, help='GPU ID for using')
+parser.add_argument('--gpuids', default=0, nargs='+', help='GPU ID for using')
+parser.add_argument('--alpha', default=0.5, type=float, help='Loss alpha')
 opt = parser.parse_args()
 
+opt.gpuids = list(map(int, opt.gpuids))
 print(opt)
 
 # cuda(GPU) exception
@@ -40,15 +42,17 @@ testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batc
 
 # load model and criterion(loss)
 srcnn = SRCNN()
-criterion = SRLoss(0.84)
+# criterion = SRLoss(0.5)
+criterion = nn.MSELoss()
 
 # set cuda(GPU)
-if (use_cuda):
-    torch.cuda.set_device(opt.gpuid)
-    srcnn.cuda()
-    criterion = criterion.cuda()
+if use_cuda:
+    torch.cuda.set_device(opt.gpuids[0])
+    with torch.cuda.device(opt.gpuids[0]):
+        srcnn = srcnn.cuda()
+        criterion = criterion.cuda()
+    srcnn = nn.DataParallel(srcnn, device_ids=opt.gpuids, output_device=opt.gpuids[0])
 
-# optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
 optimizer = optim.Adam(srcnn.parameters(), lr=opt.lr)
 
 
@@ -71,6 +75,7 @@ def train(epoch):
         if use_cuda:
             input = input.cuda()
             target = target.cuda()
+            target = target - input     # VDSR
 
         optimizer.zero_grad()
         model_out = srcnn(input)
@@ -100,9 +105,9 @@ def test():
             input = input.cuda()
             target = target.cuda()
 
-        prediction = srcnn(input)
-        mse = criterion(prediction, target)
-        psnr = 10 * log10(1 / mse.item())
+        prediction = torch.add(srcnn(input), 1, input)
+        loss = criterion(prediction, target)
+        psnr = 10 * log10(1 / loss.item())
         avg_psnr += psnr
     print("===> Avg. PSNR: {:.6f} dB".format(avg_psnr / len(testing_data_loader)))
 
@@ -123,7 +128,7 @@ def checkpoint(epoch):
             raise
 
     model_out_path = "model/model_epoch_{}.pth".format(epoch)
-    torch.save(srcnn, model_out_path)
+    torch.save(srcnn.state_dict(), model_out_path)
     print("Checkpoint saved to {}".format(model_out_path))
 
 

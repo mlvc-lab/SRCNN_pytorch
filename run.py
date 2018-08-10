@@ -10,6 +10,8 @@ from PIL import Image
 from torchvision.transforms import ToTensor
 import numpy as np
 
+from model import SRCNN
+
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch Super Res Example')
 parser.add_argument('--model', type=str, required=True, help='model file to use')
@@ -28,7 +30,8 @@ y, cb, cr = img.split()
 img = img.resize((int(img.size[0]*opt.scale_factor), int(img.size[1]*opt.scale_factor)), Image.BICUBIC)
 
 model_name = join("model", opt.model)
-model = torch.load(model_name)
+model = SRCNN()
+model.load_state_dict(torch.load(model_name))
 input = Variable(ToTensor()(img)).view(1, -1, img.size[1], img.size[0])
 
 if opt.cuda:
@@ -37,6 +40,7 @@ if opt.cuda:
     input = input.cuda()
 
 out = model(input)
+out = torch.add(out, 1, input)      # VDSR
 out = out.cpu()
 
 print("type = ", type(out))
