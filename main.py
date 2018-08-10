@@ -10,7 +10,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from data import get_training_set, get_test_set
-from model import SRCNN, SRLoss
+from model import Generator, SRLoss
 
 # set option parameter
 parser = argparse.ArgumentParser(description='PyTorch Super Resolution Example')
@@ -41,19 +41,19 @@ testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batc
                                  shuffle=False)
 
 # load model and criterion(loss)
-srcnn = SRCNN()
-# criterion = SRLoss(0.5)
-criterion = nn.MSELoss()
+generator = Generator()
+criterion = SRLoss(opt.alpha)
+# criterion = nn.MSELoss()
 
 # set cuda(GPU)
 if use_cuda:
     torch.cuda.set_device(opt.gpuids[0])
     with torch.cuda.device(opt.gpuids[0]):
-        srcnn = srcnn.cuda()
+        generator = generator.cuda()
         criterion = criterion.cuda()
-    srcnn = nn.DataParallel(srcnn, device_ids=opt.gpuids, output_device=opt.gpuids[0])
+    generator = nn.DataParallel(generator, device_ids=opt.gpuids, output_device=opt.gpuids[0])
 
-optimizer = optim.Adam(srcnn.parameters(), lr=opt.lr)
+optimizer = optim.Adam(generator.parameters(), lr=opt.lr)
 
 
 # train
@@ -75,10 +75,9 @@ def train(epoch):
         if use_cuda:
             input = input.cuda()
             target = target.cuda()
-            target = target - input     # VDSR
 
         optimizer.zero_grad()
-        model_out = srcnn(input)
+        model_out = generator(input)
         loss = criterion(model_out, target)
         epoch_loss += loss.item()
         loss.backward()
@@ -105,8 +104,8 @@ def test():
             input = input.cuda()
             target = target.cuda()
 
-        prediction = torch.add(srcnn(input), 1, input)
-        loss = criterion(prediction, target)
+        prediction = generator(input)
+        loss = nn.MSELoss()(prediction, target)
         psnr = 10 * log10(1 / loss.item())
         avg_psnr += psnr
     print("===> Avg. PSNR: {:.6f} dB".format(avg_psnr / len(testing_data_loader)))
@@ -128,7 +127,7 @@ def checkpoint(epoch):
             raise
 
     model_out_path = "model/model_epoch_{}.pth".format(epoch)
-    torch.save(srcnn.state_dict(), model_out_path)
+    torch.save(generator.state_dict(), model_out_path)
     print("Checkpoint saved to {}".format(model_out_path))
 
 

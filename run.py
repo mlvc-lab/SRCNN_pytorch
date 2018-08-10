@@ -2,15 +2,14 @@ from __future__ import print_function
 from os.path import join
 import argparse
 import torch
-from scipy import ndimage
-from scipy.misc import imsave
+import torch.nn as nn
 from torch.autograd import Variable
 from PIL import Image
 
 from torchvision.transforms import ToTensor
 import numpy as np
 
-from model import SRCNN
+from model import Generator
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch Super Res Example')
@@ -19,9 +18,10 @@ parser.add_argument('--input_image', type=str, default='test.jpg', help='input i
 parser.add_argument('--output_filename', default='test_out.jpg', type=str, help='where to save the output image')
 parser.add_argument('--scale_factor', default=3, type=float, help='factor by which super resolution needed')
 parser.add_argument('--cuda', action='store_true', help='use cuda')
-parser.add_argument('--gpuid', default=0, type=int, help='GPU ID for using')
+parser.add_argument('--gpuids', default=0, nargs='+', help='GPU ID for using')
 opt = parser.parse_args()
 
+opt.gpuids = list(map(int, opt.gpuids))
 print(opt)
 
 img = Image.open(opt.input_image).convert('YCbCr')
@@ -30,18 +30,22 @@ y, cb, cr = img.split()
 img = img.resize((int(img.size[0]*opt.scale_factor), int(img.size[1]*opt.scale_factor)), Image.BICUBIC)
 
 model_name = join("model", opt.model)
-model = SRCNN()
-model.load_state_dict(torch.load(model_name))
-input = Variable(ToTensor()(img)).view(1, -1, img.size[1], img.size[0])
+model = Generator()
+
+with torch.no_grad():
+    input = Variable(ToTensor()(img)).view(1, -1, img.size[1], img.size[0])
 
 if opt.cuda:
-    torch.cuda.set_device(opt.gpuid)
-    model = model.cuda()
-    input = input.cuda()
+    torch.cuda.set_device(opt.gpuids[0])
+    with torch.cuda.device(opt.gpuids[0]):
+        model = model.cuda()
+        criterion = model.cuda()
+    model = nn.DataParallel(model, device_ids=opt.gpuids, output_device=opt.gpuids[0])
+model.load_state_dict(torch.load(model_name))
 
-out = model(input)
-out = torch.add(out, 1, input)      # VDSR
-out = out.cpu()
+
+out = model(input).cpu()
+# out = out.cpu()
 
 print("type = ", type(out))
 out_img_y = out.data[0].numpy()
