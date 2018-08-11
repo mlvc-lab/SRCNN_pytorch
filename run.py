@@ -2,10 +2,10 @@ from __future__ import print_function
 from os.path import join
 import argparse
 import torch
+import torch.nn as nn
 import math
 from torch.autograd import Variable
 from PIL import Image
-
 from torchvision.transforms import ToTensor
 import numpy as np
 
