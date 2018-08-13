@@ -40,7 +40,7 @@ def input_transform(crop_size, upscale_factor):
     return Compose([
         CenterCrop(crop_size),
         Resize(crop_size // upscale_factor, PIL.Image.BICUBIC),
-        Resize(crop_size, PIL.Image.BICUBIC),
+        Resize(crop_size, PIL.Image.LANCZOS),
         ToTensor(),
     ])
 

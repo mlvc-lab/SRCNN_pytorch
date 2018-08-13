@@ -2,6 +2,7 @@ from __future__ import print_function
 from os.path import join
 import argparse
 import torch
+import torch.nn as nn
 import math
 from torch.autograd import Variable
 from PIL import Image
@@ -37,7 +38,6 @@ if opt.cuda:
 		model = model.cuda()
 		input = input.cuda()
 	model = nn.DataParallel(model, device_ids=opt.gpuids, output_device=opt.gpuids[0])
-model.load_state_dict(torch.load(model_name))
 
 
 out = model(input).cpu()
