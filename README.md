@@ -8,11 +8,11 @@ python-tk (or pyhton3-tk)
 
 ## Training
 
-	> python main.py --upscale_factor 3 --batch_size 10 --cuda --test_batch_size 20 --epochs 100 --lr 0.01 --gpuids 0 1
+	> python main.py --upscale_factor 3 --batch_size 16 --cuda --test_batch_size 16 --epochs 200 --lr 0.01 --gpuids 0 1
 
 or
 
-	> python3 main.py --upscale_factor 3 --batch_size 10 --cuda --test_batch_size 20 --epochs 100 --lr 0.01 --gpuids 0 1
+	> python3 main.py --upscale_factor 3 --batch_size 16 --cuda --test_batch_size 16 --epochs 200 --lr 0.01 --gpuids 0 1
 
 ## Sample Usage
 
