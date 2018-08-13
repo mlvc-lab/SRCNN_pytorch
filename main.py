@@ -21,10 +21,11 @@ parser.add_argument('--epochs', type=int, default=2, help='number of epochs to t
 parser.add_argument('--lr', type=float, default=0.01, help='Learning Rate. Default=0.01')
 parser.add_argument('--cuda', action='store_true', help='use cuda?')
 parser.add_argument('--threads', type=int, default=4, help='number of threads for data loader to use')
-parser.add_argument('--gpuid', default=0, type=int, help='GPU ID for using')
+parser.add_argument('--gpuids', default=0, nargs='+',  help='GPU ID for using')
 # parser.add_argument('--seed', type=int, default=123, help='random seed to use. Default=123')
 opt = parser.parse_args()
 
+opt.gpuids = list(map(int,opt.gpuids))
 print(opt)
 
 
@@ -43,14 +44,16 @@ training_data_loader = DataLoader(dataset=train_set, num_workers=opt.threads, ba
 testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.test_batch_size, shuffle=False)
 
 
-srcnn = ResNet50()
+srcnn = SRCNN()
 criterion = nn.MSELoss()
 
 
 if(use_cuda):
-    torch.cuda.set_device(opt.gpuid)
-    srcnn.cuda()
-    criterion = criterion.cuda()
+	torch.cuda.set_device(opt.gpuids[0])
+	with torch.cuda.device(opt.gpuids[0]):
+		srcnn.cuda()
+		criterion = criterion.cuda()
+	srcnn=nn.DataParallel(srcnn, device_ids=opt.gpuids, output_device=opt.gpuids[0])
 
 #optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
 optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)

@@ -16,8 +16,10 @@ parser.add_argument('--model', type=str, required=True, help='model file to use'
 parser.add_argument('--output_filename', type=str, help='where to save the output image')
 parser.add_argument('--scale_factor', type=float, help='factor by which super resolution needed')
 parser.add_argument('--cuda', action='store_true', help='use cuda')
+parser.add_argument('--gpuids', default=0, nargs='+', help='GPU ID for using')
 opt = parser.parse_args()
 
+opt.gpuids = list(map(int, opt.gpuids))
 print(opt)
 
 img = Image.open(opt.input_image).convert('YCbCr')
@@ -30,11 +32,15 @@ model = torch.load(model_name)
 input = Variable(ToTensor()(img)).view(1, -1, img.size[1], img.size[0])
 
 if opt.cuda:
-    model = model.cuda()
-    input = input.cuda()
+	torch.cuda.set_device(opt.gpuids[0])
+	with torch.cuda.device(opt.gpuids[0]):
+		model = model.cuda()
+		input = input.cuda()
+	model = nn.DataParallel(model, device_ids=opt.gpuids, output_device=opt.gpuids[0])
+model.load_state_dict(torch.load(model_name))
 
-out = model(input)
-out = out.cpu()
+
+out = model(input).cpu()
 
 print ("type = ",type(out))
 out_img_y = out.data[0].numpy()
