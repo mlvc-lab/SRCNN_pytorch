@@ -2,9 +2,9 @@
 PyTorch Implementation
 
 ## Requirement
-torch
-torchvision
-python-tk (or pyhton3-tk)
+torch  
+torchvision  
+python-tk (or pyhton3-tk)  
 
 ## Training
 
