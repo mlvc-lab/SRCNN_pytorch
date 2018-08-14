@@ -10,7 +10,7 @@ class SRCNN(nn.Module):
     def __init__(self):
         super(SRCNN, self).__init__()
 
-        self.input = ConvBlock(3, 64,  kernel_size=3, padding=1)
+        self.input = ConvBlock(3,64,  kernel_size=3, padding=1)
         self.layers = self.make_layer(Conv_ReLU_Block, 8)
         self.output = ConvBlock(3,3, kernel_size=3, padding=1, activation=None)
 
