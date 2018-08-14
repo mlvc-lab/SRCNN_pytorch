@@ -11,6 +11,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from data import get_training_set, get_test_set
 from model import Generator, Discriminator, GANLoss
+from ms_ssim import ssim
 
 # set option parameter
 parser = argparse.ArgumentParser(description='PyTorch Super Resolution Example')
@@ -22,7 +23,7 @@ parser.add_argument('--lr', type=float, default=0.001, help='Learning Rate. Defa
 parser.add_argument('--cuda', action='store_true', help='use cuda?')
 parser.add_argument('--threads', type=int, default=16, help='number of threads for data loader to use')
 parser.add_argument('--gpuids', default=[0], nargs='+', help='GPU ID for using')
-parser.add_argument('--alpha', default=0.65, type=float, help='Loss alpha')
+parser.add_argument('--alpha', default=0.5, type=float, help='Loss alpha')
 opt = parser.parse_args()
 
 opt.gpuids = list(map(int, opt.gpuids))
@@ -99,7 +100,6 @@ def train(epoch):
             real_loss = criterionGAN(disc_r, True)  # gan real loss
 
             loss_d = fake_loss + real_loss
-            print(fake_loss, real_loss)
 
             loss_d.backward()   # update grad
             d_optim.step()
@@ -111,9 +111,9 @@ def train(epoch):
         gen_z = generator(input)    # sr
         disc_z = discriminator(gen_z)
         loss_g_gan = criterionGAN(disc_z, True)
-        loss_g_l2 = criterionMSE(gen_z, target)
+        loss_g_l1 = criterionL1(gen_z, target)
 
-        loss_g = (opt.alpha) * loss_g_gan + (1-opt.alpha) * loss_g_l2     # g loss
+        loss_g = (opt.alpha) * loss_g_gan + (1-opt.alpha) * loss_g_l1     # g loss
         loss_g.backward()   # update grad
         g_optim.step()
 
@@ -130,6 +130,7 @@ def test():
     :return: None
     """
     avg_psnr = 0
+    avg_ssim = 0
     for batch in testing_data_loader:
         with torch.no_grad():
             input, target = Variable(batch[0]), Variable(batch[1])
@@ -141,8 +142,14 @@ def test():
         prediction = torch.add(prediction, 1, input)  # residual
         mse = nn.MSELoss()(prediction, target)
         psnr = 10 * log10(1 / mse.item())
+
         avg_psnr += psnr
-    print("===> Avg. PSNR: {:.6f} dB".format(avg_psnr / len(testing_data_loader)))
+        avg_ssim += ssim(target, prediction)
+
+    avg_psnr /= len(testing_data_loader)
+    avg_ssim /= len(testing_data_loader)
+
+    print("===> Avg. PSNR: {:.4f} dB, SSIM: {:.4f}".format(avg_psnr, avg_ssim))
 
 
 def checkpoint(epoch):
@@ -160,7 +167,7 @@ def checkpoint(epoch):
             print("Failed to create directory!!!!!")
             raise
 
-    model_out_path = "model/model_epoch_{}.pth".format(epoch)
+    model_out_path = "model/lr_{}_alpha_{}_epoch_{}.pth".format(opt.lr, opt.alpha, epoch)
     torch.save(generator.state_dict(), model_out_path)
     print("Checkpoint saved to {}".format(model_out_path))
 
@@ -170,3 +177,5 @@ for epoch in range(1, opt.epochs + 1):
     test()
     if epoch % 10 == 0:
         checkpoint(epoch)
+
+    print(opt)
