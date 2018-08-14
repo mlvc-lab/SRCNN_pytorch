@@ -27,6 +27,6 @@ class SRCNN(nn.Module):
         residual = x
         out = self.input.forward(x)
         out = self.layers(out)
-        out = self.output.forward(x)
-        out = torch.add(out,residual)
-        return out
+        out = self.output.forward(out)
+        out2 = torch.add(out,residual)
+        return out, out2

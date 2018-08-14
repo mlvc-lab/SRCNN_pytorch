@@ -42,9 +42,15 @@ test_set = get_test_set(opt.upscale_factor)
 training_data_loader = DataLoader(dataset=train_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=True)
 testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.test_batch_size, shuffle=False)
 
+loss_alpha = 1.0
+loss_alpha_zero_epoch = 25
+loss_alpha_decay = loss_alpha/loss_alpha_zero_epoch
+loss_beta = 0.001
+
 
 srcnn = SRCNN()
 criterion = nn.MSELoss()
+
 
 
 if(use_cuda):
@@ -66,8 +72,13 @@ def train(epoch):
             target = target.cuda()
 
         optimizer.zero_grad()
-        model_out = srcnn(input)
-        loss = criterion(model_out, target)
+        model_out, model_out2 = srcnn(input)
+
+        reg_term = 0
+        for theta in srcnn.parameters():
+            reg_term += torch.mean(torch.sum(theta ** 2))
+
+        loss = loss_alpha * criterion(model_out, target) + (1-loss_alpha) * criterion(model_out2,target) + loss_beta*reg_term
         epoch_loss += loss.data[0]
         loss.backward()
         optimizer.step()
@@ -110,6 +121,7 @@ def checkpoint(epoch):
 
 for epoch in range(1, opt.epochs + 1):
     train(epoch)
+    loss_alpha = max(0.0, loss_alpha - loss_alpha_decay)
     test()
     if(epoch%10==0):
         checkpoint(epoch)
