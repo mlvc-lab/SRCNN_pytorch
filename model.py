@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
-from blocks import ConvBlock, ResnetBlock, Pool
+from blocks import ConvBlock, ResnetBlock, Pool, BottleNeckBlock
 from ms_ssim import msssim
 
 
@@ -10,10 +10,10 @@ class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
 
-        layers = [ConvBlock(3, 32, kernel_size=5, padding=2), ConvBlock(32, 64, kernel_size=5, padding=2)]
+        layers = [ConvBlock(3, 128, kernel_size=9, padding=4)]
         for i in range(7):
-            layers.append(ResnetBlock(64))
-        layers.append(ConvBlock(64, 3, kernel_size=3, padding=1, activation=None))
+            layers.append(BottleNeckBlock(128))
+        layers.append(ConvBlock(128, 3, kernel_size=3, padding=1, activation=None))
         layers.append(ConvBlock(3, 3, kernel_size=1, padding=0, activation=None))
 
         self.layers = nn.Sequential(*layers)
@@ -25,31 +25,26 @@ class Generator(nn.Module):
 class Discriminator(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
+        self.activation = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
 
         layers = [
             ConvBlock(3, 32, kernel_size=3, padding=1, norm='batch'),
-            Pool(2, 2),
             ConvBlock(32, 64, kernel_size=3, padding=1, norm='batch'),
-            Pool(2, 2),
+            ConvBlock(64, 64, kernel_size=3, stride=2, padding=1),
             ConvBlock(64, 128, kernel_size=3, padding=1, norm='batch'),
-            ConvBlock(128, 128, kernel_size=3, padding=1, norm='batch'),
-            Pool(2, 2),
+            ConvBlock(128, 128, kernel_size=3, stride=2, padding=1),
             ConvBlock(128, 256, kernel_size=3, padding=1, norm='batch'),
+            ConvBlock(256, 256, kernel_size=3, stride=2, padding=1),
             ConvBlock(256, 512, kernel_size=3, padding=1, norm='batch'),
-            Pool(2, 2),
-            ConvBlock(512, 512, kernel_size=3, padding=1, norm='batch'),
-            ConvBlock(512, 512, kernel_size=3, padding=1, norm='batch'),
-            Pool(2, 2),
+            ConvBlock(512, 512, kernel_size=3, stride=2, padding=1),
+
+            ConvBlock(512, 1, kernel_size=1, stride=1, padding=1),
         ]
         self.layers = nn.Sequential(*layers)
-        self.l1 = nn.Linear((512 * 7 * 7), 1024)
-        self.l2 = nn.Linear(1024, 1)
 
     def forward(self, x):
-        x = self.layers(x)
-        x = x.view(-1, 512 * 7 * 7)
-        x = self.l1(x)
-        x = self.l2(x)
+        x = self.sigmoid(self.layers(x))
         return x
 
 
@@ -84,7 +79,7 @@ class GANLoss(nn.Module):
         self.fake_label_var = None
         self.Tensor = tensor
         if use_lsgan:
-            self.loss = nn.MSELoss()
+            self.loss = SRLoss(0.5)
         else:
             self.loss = nn.BCELoss()
 

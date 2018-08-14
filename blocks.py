@@ -42,7 +42,7 @@ class ConvBlock(nn.Module):
 
 
 class ResnetBlock(torch.nn.Module):
-    def __init__(self, num_filter, kernel_size=3, stride=1, padding=1, activation='relu', norm='batch'):
+    def __init__(self, num_filter, kernel_size=3, stride=1, padding=1, activation='lrelu', norm='batch'):
         super(ResnetBlock, self).__init__()
         self.conv1 = torch.nn.Conv2d(num_filter, num_filter, kernel_size, stride, padding)
         self.conv2 = torch.nn.Conv2d(num_filter, num_filter, kernel_size, stride, padding)
@@ -89,11 +89,11 @@ class ResnetBlock(torch.nn.Module):
 
 
 class BottleNeckBlock(torch.nn.Module):
-    def __init__(self, num_filter, kernel_size=3, stride=1, padding=1, activation='relu', norm='batch'):
+    def __init__(self, num_filter, kernel_size=3, stride=1, padding=1, activation='relu', norm=None):
         super(BottleNeckBlock, self).__init__()
         self.conv1 = torch.nn.Conv2d(num_filter, num_filter//4, 1, stride, 0)
         self.conv2 = torch.nn.Conv2d(num_filter//4, num_filter//4, kernel_size, stride, padding)
-        self.conv2 = torch.nn.Conv2d(num_filter//4, num_filter, 1, stride, 0)
+        self.conv3 = torch.nn.Conv2d(num_filter//4, num_filter, 1, stride, 0)
 
         self.norm = norm
         if self.norm == 'batch':

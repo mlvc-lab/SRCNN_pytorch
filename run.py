@@ -18,7 +18,7 @@ parser.add_argument('--input_image', type=str, default='test.jpg', help='input i
 parser.add_argument('--output_filename', default='test_out.jpg', type=str, help='where to save the output image')
 parser.add_argument('--scale_factor', default=3, type=float, help='factor by which super resolution needed')
 parser.add_argument('--cuda', action='store_true', help='use cuda')
-parser.add_argument('--gpuids', default=0, nargs='+', help='GPU ID for using')
+parser.add_argument('--gpuids', default=[0], nargs='+', help='GPU ID for using')
 opt = parser.parse_args()
 
 opt.gpuids = list(map(int, opt.gpuids))
@@ -42,7 +42,6 @@ if opt.cuda:
         input = input.cuda()
     model = nn.DataParallel(model, device_ids=opt.gpuids, output_device=opt.gpuids[0])
 model.load_state_dict(torch.load(model_name))
-
 
 out = model(input)
 out = torch.add(out, 1, input)      # residual

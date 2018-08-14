@@ -21,8 +21,8 @@ parser.add_argument('--epochs', type=int, default=100, help='number of epochs to
 parser.add_argument('--lr', type=float, default=0.001, help='Learning Rate. Default=0.01')
 parser.add_argument('--cuda', action='store_true', help='use cuda?')
 parser.add_argument('--threads', type=int, default=16, help='number of threads for data loader to use')
-parser.add_argument('--gpuids', default=0, nargs='+', help='GPU ID for using')
-parser.add_argument('--alpha', default=0.5, type=float, help='Loss alpha')
+parser.add_argument('--gpuids', default=[0], nargs='+', help='GPU ID for using')
+parser.add_argument('--alpha', default=0.65, type=float, help='Loss alpha')
 opt = parser.parse_args()
 
 opt.gpuids = list(map(int, opt.gpuids))
@@ -59,8 +59,8 @@ if use_cuda:
     generator = nn.DataParallel(generator, device_ids=opt.gpuids, output_device=opt.gpuids[0])
     discriminator = nn.DataParallel(discriminator, device_ids=opt.gpuids, output_device=opt.gpuids[0])
 
-g_optim = optim.Adam(generator.parameters(), betas=(0.5, 0.999), lr=opt.lr)
-d_optim = optim.Adam(discriminator.parameters(), betas=(0.5, 0.999), lr=opt.lr)
+g_optim = optim.Adam(generator.parameters(), lr=opt.lr)
+d_optim = optim.Adam(discriminator.parameters(), lr=opt.lr)
 
 
 # train
@@ -87,37 +87,39 @@ def train(epoch):
             target = target.cuda()
             target = target - input   # residual
 
-        # training D
-        d_optim.zero_grad()   # grad init
-        gen_z = generator(input)    # gen SR image
+        ############# training D ##############
+        if iteration % 2 == 0:
+            d_optim.zero_grad()   # grad init
+            gen_z = generator(input)    # gen SR image
 
-        disc_z = discriminator(gen_z.detach())  # disc result of fake image
-        fake_loss = criterionGAN(disc_z, False)  # gan fake loss
+            disc_z = discriminator(gen_z.detach())  # disc result of fake image
+            fake_loss = criterionGAN(disc_z, False)  # gan fake loss
 
-        disc_r = discriminator(target)  # disc result of real image
-        real_loss = criterionGAN(disc_r, True)  # gan real loss
+            disc_r = discriminator(target)  # disc result of real image
+            real_loss = criterionGAN(disc_r, True)  # gan real loss
 
-        loss_d = (fake_loss + real_loss) * 0.5
+            loss_d = fake_loss + real_loss
+            print(fake_loss, real_loss)
 
-        loss_d.backward()   # update grad
-        d_optim.step()
+            loss_d.backward()   # update grad
+            d_optim.step()
 
-        epoch_d_loss += loss_d
+            epoch_d_loss += loss_d
 
-        # training G
+        ############# training G ##############
         g_optim.zero_grad()   # grad init
         gen_z = generator(input)    # sr
-        disc_z = discriminator(gen_z.detach())
+        disc_z = discriminator(gen_z)
         loss_g_gan = criterionGAN(disc_z, True)
-        loss_g_l1 = criterionMSE(gen_z.detach(), target)
+        loss_g_l2 = criterionMSE(gen_z, target)
 
-        loss_g = loss_g_gan + loss_g_l1     # g loss
+        loss_g = (opt.alpha) * loss_g_gan + (1-opt.alpha) * loss_g_l2     # g loss
         loss_g.backward()   # update grad
         g_optim.step()
 
         epoch_g_loss = loss_g
 
-    print("Epoch {}: GLoss: {:.4f} DLoss: {:.4f}"
+    print("Epoch {}: GLoss: {:.6f} DLoss: {:.6f}"
           .format(epoch, epoch_g_loss / len(training_data_loader), epoch_d_loss / len(training_data_loader)))
 
 
@@ -137,8 +139,8 @@ def test():
 
         prediction = generator(input)
         prediction = torch.add(prediction, 1, input)  # residual
-        loss = nn.MSELoss()(prediction, target)
-        psnr = 10 * log10(1 / loss.item())
+        mse = nn.MSELoss()(prediction, target)
+        psnr = 10 * log10(1 / mse.item())
         avg_psnr += psnr
     print("===> Avg. PSNR: {:.6f} dB".format(avg_psnr / len(testing_data_loader)))
 
