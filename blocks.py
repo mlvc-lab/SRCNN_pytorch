@@ -42,7 +42,7 @@ class ConvBlock(nn.Module):
 
 
 class ResnetBlock(torch.nn.Module):
-    def __init__(self, num_filter, kernel_size=3, stride=1, padding=1, activation='lrelu', norm='batch'):
+    def __init__(self, num_filter, kernel_size=3, stride=1, padding=1, activation='relu', norm='batch'):
         super(ResnetBlock, self).__init__()
         self.conv1 = torch.nn.Conv2d(num_filter, num_filter, kernel_size, stride, padding)
         self.conv2 = torch.nn.Conv2d(num_filter, num_filter, kernel_size, stride, padding)

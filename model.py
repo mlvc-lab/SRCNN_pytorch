@@ -10,10 +10,10 @@ class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
 
-        layers = [ConvBlock(3, 128, kernel_size=9, padding=4)]
+        layers = [ConvBlock(3, 128, kernel_size=9, padding=4, activation='prelu')]
         for i in range(7):
-            layers.append(BottleNeckBlock(128))
-        layers.append(ConvBlock(128, 3, kernel_size=3, padding=1, activation=None))
+            layers.append(BottleNeckBlock(128, activation='prelu'))
+        layers.append(ConvBlock(128, 3, kernel_size=3, padding=1, activation='prelu'))
         layers.append(ConvBlock(3, 3, kernel_size=1, padding=0, activation=None))
 
         self.layers = nn.Sequential(*layers)
@@ -49,14 +49,13 @@ class Discriminator(nn.Module):
 
 
 class SRLoss(nn.Module):
-    def __init__(self, alpha):
+    def __init__(self, alpha=0.5):
         super(SRLoss, self).__init__()
 
         self.alpha = alpha
         self.msssim = msssim
         self.l1 = nn.L1Loss()
         self.mse = nn.MSELoss()
-        self.bce = nn.BCELoss()
 
     def msssim_l1(self, input, target):
         return self.alpha * (1 - self.msssim(input, target)) + (1 - self.alpha) * (self.l1(input, target))
@@ -70,7 +69,7 @@ class SRLoss(nn.Module):
 
 # Defines the GAN loss which uses either LSGAN or the regular GAN.
 class GANLoss(nn.Module):
-    def __init__(self, use_lsgan=True, target_real_label=1.0, target_fake_label=0.0,
+    def __init__(self, use_lsgan=False, target_real_label=1.0, target_fake_label=0.0,
                  tensor=torch.FloatTensor, cuda=True):
         super(GANLoss, self).__init__()
         self.real_label = target_real_label
