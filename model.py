@@ -77,7 +77,6 @@ class SRLoss(nn.Module):
             self.msssim = msssim
             self.l1 = nn.L1Loss()
             self.loss = self.msssim_l1
-        else 
 
     def msssim_l1(self, input, target):
         return self.alpha * (1 - self.msssim(input, target)) + (1 - self.alpha) * (self.l1(input, target))
