@@ -2,44 +2,56 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
-from blocks import ConvBlock, ResnetBlock, Pool, BottleNeckBlock
+from blocks import ConvBlock, ResnetBlock, Pool, BottleNeckBlock, UpsampleBlock
 from ms_ssim import msssim
 
 
 class Generator(nn.Module):
-    def __init__(self):
+    """
+    Generate Super Resolution Image
+    """
+    def __init__(self, scale_factor=3):
         super(Generator, self).__init__()
+        self.pool = nn.AvgPool2d(kernel_size=scale_factor, stride=scale_factor)
 
         layers = [ConvBlock(3, 128, kernel_size=9, padding=4, activation='prelu')]
-        for i in range(7):
+        for i in range(5):
             layers.append(BottleNeckBlock(128, activation='prelu'))
-        layers.append(ConvBlock(128, 3, kernel_size=3, padding=1, activation='prelu'))
-        layers.append(ConvBlock(3, 3, kernel_size=1, padding=0, activation=None))
+        # layers.append(ConvBlock(128, scale_factor*scale_factor*15, kernel_size=1, padding=0, activation='prelu'))
+        self.feature_ext = nn.Sequential(*layers)
 
-        self.layers = nn.Sequential(*layers)
+        self.conv1 = ConvBlock(128, 3, kernel_size=3, padding=1, activation='prelu')
+        self.upsample = UpsampleBlock(128, 3, upscale_factor=scale_factor)
+
+        self.outconv = ConvBlock(6, 3, kernel_size=9, padding=4, activation=None)
 
     def forward(self, input):
-        return self.layers(input)
+        origin = self.conv1(self.feature_ext(input))
+        half = self.upsample(self.feature_ext(self.pool(input)))
+        return self.outconv(torch.cat((origin, half), 1))
 
 
 class Discriminator(nn.Module):
+    """
+    Discriminator to discriminate SR and LR
+    """
     def __init__(self):
         super(Discriminator, self).__init__()
         self.activation = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
         layers = [
-            ConvBlock(3, 32, kernel_size=3, padding=1, norm='batch'),
-            ConvBlock(32, 64, kernel_size=3, padding=1, norm='batch'),
-            ConvBlock(64, 64, kernel_size=3, stride=2, padding=1),
-            ConvBlock(64, 128, kernel_size=3, padding=1, norm='batch'),
-            ConvBlock(128, 128, kernel_size=3, stride=2, padding=1),
-            ConvBlock(128, 256, kernel_size=3, padding=1, norm='batch'),
-            ConvBlock(256, 256, kernel_size=3, stride=2, padding=1),
-            ConvBlock(256, 512, kernel_size=3, padding=1, norm='batch'),
-            ConvBlock(512, 512, kernel_size=3, stride=2, padding=1),
+            ConvBlock(3, 32, kernel_size=3, padding=1, norm='batch', activation='lrelu'),
+            ConvBlock(32, 64, kernel_size=3, padding=1, norm='batch', activation='lrelu'),
+            ConvBlock(64, 64, kernel_size=3, stride=2, padding=1, activation='lrelu'),
+            ConvBlock(64, 128, kernel_size=3, padding=1, norm='batch', activation='lrelu'),
+            ConvBlock(128, 128, kernel_size=3, stride=2, padding=1, activation='lrelu'),
+            ConvBlock(128, 256, kernel_size=3, padding=1, norm='batch', activation='lrelu'),
+            ConvBlock(256, 256, kernel_size=3, stride=2, padding=1, activation='lrelu'),
+            ConvBlock(256, 512, kernel_size=3, padding=1, norm='batch', activation='lrelu'),
+            ConvBlock(512, 512, kernel_size=3, stride=2, padding=1, activation='lrelu'),
 
-            ConvBlock(512, 1, kernel_size=1, stride=1, padding=1),
+            ConvBlock(512, 1, kernel_size=1, stride=1, padding=1, activation=None),
         ]
         self.layers = nn.Sequential(*layers)
 
@@ -49,13 +61,23 @@ class Discriminator(nn.Module):
 
 
 class SRLoss(nn.Module):
-    def __init__(self, alpha=0.5):
+    """
+    Multi losses
+    """
+    def __init__(self, loss='l1_mse', alpha=0.5):
         super(SRLoss, self).__init__()
 
         self.alpha = alpha
-        self.msssim = msssim
-        self.l1 = nn.L1Loss()
-        self.mse = nn.MSELoss()
+
+        if loss == 'l1_mse':
+            self.l1 = nn.L1Loss()
+            self.mse = nn.MSELoss()
+            self.loss = self.l1_mse
+        elif loss == 'msssim_l1':
+            self.msssim = msssim
+            self.l1 = nn.L1Loss()
+            self.loss = self.msssim_l1
+        else 
 
     def msssim_l1(self, input, target):
         return self.alpha * (1 - self.msssim(input, target)) + (1 - self.alpha) * (self.l1(input, target))
@@ -64,12 +86,12 @@ class SRLoss(nn.Module):
         return self.alpha * self.l1(input, target) + (1-self.alpha) * self.mse(input, target)
 
     def forward(self, input, target):
-        return self.l1_mse(input, target)
+        return self.loss(input, target)
 
 
 # Defines the GAN loss which uses either LSGAN or the regular GAN.
 class GANLoss(nn.Module):
-    def __init__(self, use_lsgan=False, target_real_label=1.0, target_fake_label=0.0,
+    def __init__(self, use_lsgan=True, target_real_label=1.0, target_fake_label=0.0,
                  tensor=torch.FloatTensor, cuda=True):
         super(GANLoss, self).__init__()
         self.real_label = target_real_label

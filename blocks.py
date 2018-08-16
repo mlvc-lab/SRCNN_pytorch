@@ -155,3 +155,16 @@ class Pool(nn.Module):
 
     def forward(self, x):
         return self.pool(x)
+
+
+class UpsampleBlock(nn.Module):
+    # Implements resize-convolution
+    def __init__(self, in_channels, out_channels, upscale_factor):
+        super(UpsampleBlock, self).__init__()
+        self.upscale_factor = upscale_factor
+        self.conv = nn.Conv2d(in_channels, out_channels*upscale_factor*upscale_factor, 3, stride=1, padding=1)
+        self.shuffler = nn.PixelShuffle(upscale_factor)
+
+    def forward(self, x):
+        x = self.conv(x)
+        return self.shuffler(x)
