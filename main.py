@@ -51,8 +51,8 @@ if(use_cuda):
     srcnn.cuda()
     criterion = criterion.cuda()
 
-optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
-#optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)
+#optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
+optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)
 
 def train(epoch):
     epoch_loss = 0
