@@ -10,20 +10,20 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from data import get_training_set, get_test_set
-from model import Generator, Discriminator, GANLoss
+from model import Generator, Discriminator, GANLoss, SRLoss
 
 # set option parameter
 parser = argparse.ArgumentParser(description='PyTorch Super Resolution Example')
 parser.add_argument('--save_path', type=str, default='model', help='model save path')
 parser.add_argument('--upscale_factor', type=int, default=3, help="super resolution upscale factor")
-parser.add_argument('--batch_size', type=int, default=21, help='training batch size')
-parser.add_argument('--test_batch_size', type=int, default=12, help='testing batch size')
-parser.add_argument('--epochs', type=int, default=100, help='number of epochs to train for')
-parser.add_argument('--lr', type=float, default=0.001, help='Learning Rate. Default=0.01')
+parser.add_argument('--batch_size', type=int, default=24, help='training batch size')
+parser.add_argument('--test_batch_size', type=int, default=6, help='testing batch size')
+parser.add_argument('--epochs', type=int, default=30, help='number of epochs to train for')
+parser.add_argument('--lr', type=float, default=0.0003, help='Learning Rate. Default=0.01')
 parser.add_argument('--cuda', action='store_true', help='use cuda?')
 parser.add_argument('--threads', type=int, default=32, help='number of threads for data loader to use')
 parser.add_argument('--gpuids', default=[1, 2, 3], nargs='+', help='GPU ID for using')
-parser.add_argument('--alpha', default=0.5, type=float, help='Loss alpha')
+parser.add_argument('--alpha', default=0.25, type=float, help='Loss alpha')
 opt = parser.parse_args()
 
 opt.gpuids = list(map(int, opt.gpuids))
@@ -44,22 +44,21 @@ testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batc
 # load model and criterion(loss)
 generator = Generator()
 discriminator = Discriminator()
-criterionGAN = GANLoss()
+criterionGAN = GANLoss(alpha=opt.alpha)
 criterionL1 = nn.L1Loss()
 criterionMSE = nn.MSELoss()
+criterionMsssim_l1 = SRLoss(loss='msssim_l1', alpha=opt.alpha)
 
 # set cuda(GPU)
 if use_cuda:
     torch.cuda.set_device(opt.gpuids[0])
-    with torch.cuda.device(opt.gpuids[0]):
-        generator = generator.cuda()
-        discriminator = discriminator.cuda()
-        criterionGAN = criterionGAN.cuda()
-        criterionL1 = criterionL1.cuda()
-        criterionMSE = criterionMSE.cuda()
+    criterionGAN = criterionGAN.cuda()
+    criterionL1 = criterionL1.cuda()
+    criterionMSE = criterionMSE.cuda()
+    criterionMsssim_l1 = criterionMsssim_l1.cuda()
     # set DataParallel to use multi gpu
-    generator = nn.DataParallel(generator, device_ids=opt.gpuids, output_device=opt.gpuids[0])
-    discriminator = nn.DataParallel(discriminator, device_ids=opt.gpuids, output_device=opt.gpuids[0])
+    generator = nn.DataParallel(generator, device_ids=opt.gpuids, output_device=opt.gpuids[0]).cuda()
+    discriminator = nn.DataParallel(discriminator, device_ids=opt.gpuids, output_device=opt.gpuids[0]).cuda()
 
 g_optim = optim.Adam(generator.parameters(), lr=opt.lr)
 d_optim = optim.Adam(discriminator.parameters(), lr=opt.lr)
@@ -113,8 +112,9 @@ def train(epoch):
         # calculate loss
         loss_g_gan = criterionGAN(disc_z, True)
         loss_g_l1 = criterionL1(gen_z, target)
+        loss_msssim_l1 = criterionMsssim_l1(gen_z, target)
 
-        loss_g = (opt.alpha) * loss_g_gan + (1-opt.alpha) * loss_g_l1     # g loss
+        loss_g = (opt.alpha) * loss_g_gan + loss_g_l1 + loss_msssim_l1     # g loss
         loss_g.backward()   # update grad
         g_optim.step()
 
@@ -135,7 +135,7 @@ def test():
     :return: avg PSNR
     """
     avg_psnr = 0
-    # avg_ssim = 0
+    avg_ssim = 0
     for batch in testing_data_loader:
         with torch.no_grad():
             input, target = Variable(batch[0]), Variable(batch[1])
@@ -174,7 +174,8 @@ def checkpoint(epoch, psnr):
             print("Failed to create directory!!!!!")
             raise
 
-    model_out_path = "{}/psnr_{:.4}_lr_{}_alpha_{}_epoch_{}.pth".format(str(opt.save_path), psnr, opt.lr, opt.alpha, epoch)
+    model_out_path = "{}/psnr_{:.4}_lr_{}_alpha_{}_epoch_{}.pth" \
+                     .format(str(opt.save_path), psnr, opt.lr, opt.alpha, epoch)
     torch.save(generator.state_dict(), model_out_path)
     print("Checkpoint saved to {}".format(model_out_path))
 

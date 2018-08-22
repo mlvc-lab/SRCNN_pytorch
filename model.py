@@ -12,7 +12,6 @@ class Generator(nn.Module):
     """
     def __init__(self, scale_factor=3):
         super(Generator, self).__init__()
-        self.pool = nn.AvgPool2d(kernel_size=scale_factor, stride=scale_factor)
 
         layers = [ConvBlock(3, 128, kernel_size=9, padding=4, activation='prelu')]
         for i in range(5):
@@ -20,6 +19,7 @@ class Generator(nn.Module):
         # layers.append(ConvBlock(128, scale_factor*scale_factor*15, kernel_size=1, padding=0, activation='prelu'))
         self.feature_ext = nn.Sequential(*layers)
 
+        self.downsample = ConvBlock(3, 3, kernel_size=2, stride=2)
         self.conv1 = ConvBlock(128, 3, kernel_size=3, padding=1, activation='prelu')
         self.upsample = UpsampleBlock(128, 3, upscale_factor=scale_factor)
 
@@ -27,7 +27,7 @@ class Generator(nn.Module):
 
     def forward(self, input):
         origin = self.conv1(self.feature_ext(input))
-        half = self.upsample(self.feature_ext(self.pool(input)))
+        half = self.upsample(self.feature_ext(self.downsample(input)))
         return self.outconv(torch.cat((origin, half), 1))
 
 
@@ -64,7 +64,7 @@ class SRLoss(nn.Module):
     """
     Multi losses
     """
-    def __init__(self, loss='l1_mse', alpha=0.5):
+    def __init__(self, loss='l1_mse', alpha=0.25):
         super(SRLoss, self).__init__()
 
         self.alpha = alpha
@@ -91,7 +91,7 @@ class SRLoss(nn.Module):
 # Defines the GAN loss which uses either LSGAN or the regular GAN.
 class GANLoss(nn.Module):
     def __init__(self, use_lsgan=True, target_real_label=1.0, target_fake_label=0.0,
-                 tensor=torch.FloatTensor, cuda=True):
+                 tensor=torch.FloatTensor, cuda=True, alpha=0.25):
         super(GANLoss, self).__init__()
         self.real_label = target_real_label
         self.fake_label = target_fake_label
@@ -99,7 +99,8 @@ class GANLoss(nn.Module):
         self.fake_label_var = None
         self.Tensor = tensor
         if use_lsgan:
-            self.loss = SRLoss(0.5)
+            self.alpha = alpha
+            self.loss = SRLoss(alpha=alpha)
         else:
             self.loss = nn.BCELoss()
 
