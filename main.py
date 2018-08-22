@@ -10,17 +10,21 @@ import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from data import get_training_set, get_test_set
-from model import SRCNN
+from model import SRCNN, Generator, init_weights, _NetG, SRLoss
 
 parser = argparse.ArgumentParser(description='PyTorch Super Resolution Example')
+parser.add_argument("--step", type=int, default=10, help="Sets the learning rate to the initial LR decayed by momentum every n epochs, Default: n=10")
 parser.add_argument('--upscale_factor', type=int, required=True, help="super resolution upscale factor")
 parser.add_argument('--batch_size', type=int, default=64, help='training batch size')
 parser.add_argument('--test_batch_size', type=int, default=10, help='testing batch size')
 parser.add_argument('--epochs', type=int, default=2, help='number of epochs to train for')
-parser.add_argument('--lr', type=float, default=0.01, help='Learning Rate. Default=0.01')
+parser.add_argument('--lr', type=float, default=1e-4, help='Learning Rate. Default=0.01')
 parser.add_argument('--cuda', action='store_true', help='use cuda?')
 parser.add_argument('--threads', type=int, default=4, help='number of threads for data loader to use')
-parser.add_argument('--gpuids', default=0, nargs='+',  help='GPU ID for using')
+parser.add_argument("--momentum", default=0.9, type=float, help="Momentum, Default: 0.9")
+parser.add_argument("--weight-decay", "--wd", default=1e-4, type=float, help="Weight decay, Default: 1e-4")
+parser.add_argument('--gpuids', default=[1,2,3], nargs='+',  help='GPU ID for using')
+parser.add_argument('--alpha', default=0.5, type=float, help='Loss alpha')
 # parser.add_argument('--seed', type=int, default=123, help='random seed to use. Default=123')
 opt = parser.parse_args()
 
@@ -42,26 +46,21 @@ test_set = get_test_set(opt.upscale_factor)
 training_data_loader = DataLoader(dataset=train_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=True)
 testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.test_batch_size, shuffle=False)
 
-loss_alpha = 1.0
-loss_alpha_zero_epoch = 25
-loss_alpha_decay = loss_alpha/loss_alpha_zero_epoch
-loss_beta = 0.001
 
-
-srcnn = SRCNN()
+model = Generator()
+#srcnn = _NetG()
 criterion = nn.MSELoss()
-
-
+#criterion = SRLoss(opt.alpha)
 
 if(use_cuda):
-	torch.cuda.set_device(opt.gpuids[0])
-	with torch.cuda.device(opt.gpuids[0]):
-		srcnn.cuda()
-		criterion = criterion.cuda()
-	srcnn=nn.DataParallel(srcnn, device_ids=opt.gpuids, output_device=opt.gpuids[0])
+        torch.cuda.set_device(opt.gpuids[0])
+        model = model.cuda()
+        criterion = criterion.cuda()
+        model = nn.DataParallel(model, device_ids=opt.gpuids, output_device=opt.gpuids[0]).cuda()
 
-#optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr)
-optimizer = optim.Adam(srcnn.parameters(),lr=opt.lr)
+#optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr, momentum=0.9,weight_decay=0.001)
+optimizer = optim.Adam(model.parameters(),lr=opt.lr)
+#optimizer = optim.SGD(srcnn.parameters(), lr=opt.lr, momentum=opt.momentum, weight_decay=opt.weight_decay)
 
 def train(epoch):
     epoch_loss = 0
@@ -72,18 +71,13 @@ def train(epoch):
             target = target.cuda()
 
         optimizer.zero_grad()
-        model_out, model_out2 = srcnn(input)
-
-        reg_term = 0
-        for theta in srcnn.parameters():
-            reg_term += torch.mean(torch.sum(theta ** 2))
-
-        loss = loss_alpha * criterion(model_out, target) + (1-loss_alpha) * criterion(model_out2,target) + loss_beta*reg_term
-        epoch_loss += loss.data[0]
+        model_out = model(input)
+        
+        loss = criterion(model_out, target)
+        epoch_loss = epoch_loss + loss.item()
         loss.backward()
+       # nn.utils.clip_grad_norm(model.parameters(),0.25)
         optimizer.step()
-
-        print("===> Epoch[{}]({}/{}): Loss: {:.4f}".format(epoch, iteration, len(training_data_loader), loss.data[0]))
 
     print("===> Epoch {} Complete: Avg. Loss: {:.4f}".format(epoch, epoch_loss / len(training_data_loader)))
 
@@ -98,14 +92,15 @@ def test():
             input = input.cuda()
             target = target.cuda()
 
-        prediction = srcnn(input)
-        mse = criterion(prediction, target)
-        psnr = 10 * log10(1 / mse.data[0])
+        prediction = model(input)
+
+        mse = nn.MSELoss()(prediction, target)
+        psnr = 10 * log10(1 / mse.item())
         avg_psnr += psnr
     print("===> Avg. PSNR: {:.4f} dB".format(avg_psnr / len(testing_data_loader)))
+    return (avg_psnr / len(testing_data_loader))
 
-
-def checkpoint(epoch):
+def checkpoint(epoch, psnr):
     try:
         if not(os.path.isdir('model')):
             os.makedirs(os.path.join('model'))
@@ -114,14 +109,11 @@ def checkpoint(epoch):
             print("Failed to create directory!!!!!")
             raise
 
-    model_out_path = "model/model_epoch_{}.pth".format(epoch)
-    torch.save(srcnn, model_out_path)
+    model_out_path = "model/model_epoch_{}_psnr_{:.4f}.pth".format(epoch,psnr )
+    torch.save(model.state_dict(), model_out_path)
     print("Checkpoint saved to {}".format(model_out_path))
-
 
 for epoch in range(1, opt.epochs + 1):
     train(epoch)
-    loss_alpha = max(0.0, loss_alpha - loss_alpha_decay)
-    test()
-    if(epoch%10==0):
-        checkpoint(epoch)
+    psnr = test()
+    checkpoint(epoch, psnr)
