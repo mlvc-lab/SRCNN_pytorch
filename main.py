@@ -21,7 +21,7 @@ parser.add_argument('--epochs', type=int, default=100, help='number of epochs to
 parser.add_argument('--lr', type=float, default=0.001, help='Learning Rate. Default=0.01')
 parser.add_argument('--cuda', action='store_true', help='use cuda?')
 parser.add_argument('--threads', type=int, default=16, help='number of threads for data loader to use')
-parser.add_argument('--gpuids', default=0, nargs='+', help='GPU ID for using')
+parser.add_argument('--gpuids', default=[0], nargs='+', help='GPU ID for using')
 parser.add_argument('--alpha', default=0.5, type=float, help='Loss alpha')
 opt = parser.parse_args()
 

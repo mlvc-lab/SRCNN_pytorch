@@ -1,6 +1,7 @@
 from __future__ import print_function
 from os.path import join
 import argparse
+from collections import OrderedDict
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -18,7 +19,7 @@ parser.add_argument('--input_image', type=str, default='test.jpg', help='input i
 parser.add_argument('--output_filename', default='test_out.jpg', type=str, help='where to save the output image')
 parser.add_argument('--scale_factor', default=3, type=float, help='factor by which super resolution needed')
 parser.add_argument('--cuda', action='store_true', help='use cuda')
-parser.add_argument('--gpuids', default=0, nargs='+', help='GPU ID for using')
+parser.add_argument('--gpuids', default=[0], nargs='+', help='GPU ID for using')
 opt = parser.parse_args()
 
 opt.gpuids = list(map(int, opt.gpuids))
@@ -36,12 +37,20 @@ with torch.no_grad():
     input = Variable(ToTensor()(img)).view(1, -1, img.size[1], img.size[0])
 
 if opt.cuda:
+    print("Using GPU")
     torch.cuda.set_device(opt.gpuids[0])
-    with torch.cuda.device(opt.gpuids[0]):
-        model = model.cuda()
-        criterion = model.cuda()
-    model = nn.DataParallel(model, device_ids=opt.gpuids, output_device=opt.gpuids[0])
-model.load_state_dict(torch.load(model_name))
+    input = input.cuda()
+    model = nn.DataParallel(model, device_ids=opt.gpuids, output_device=opt.gpuids[0]).cuda()
+    model.load_state_dict(torch.load(model_name))
+
+else:
+    print("Using CPU")
+    state_dict = torch.load(model_name)
+    state_dict_rename = OrderedDict()
+    for k, v in state_dict.items():
+        name = k[7:] # remove `module.`
+        state_dict_rename[name] = v
+    model.load_state_dict(state_dict_rename)
 
 
 out = model(input)
