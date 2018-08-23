@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 from blocks import ConvBlock, ResnetBlock, Pool, BottleNeckBlock, UpsampleBlock
-from ms_ssim import msssim
+from ms_ssim import msssim, ssim
 
 
 class Generator(nn.Module):
@@ -19,7 +19,7 @@ class Generator(nn.Module):
         # layers.append(ConvBlock(128, scale_factor*scale_factor*15, kernel_size=1, padding=0, activation='prelu'))
         self.feature_ext = nn.Sequential(*layers)
 
-        self.downsample = ConvBlock(3, 3, kernel_size=2, stride=2)
+        self.downsample = ConvBlock(3, 3, kernel_size=scale_factor, stride=scale_factor)
         self.conv1 = ConvBlock(128, 3, kernel_size=3, padding=1, activation='prelu')
         self.upsample = UpsampleBlock(128, 3, upscale_factor=scale_factor)
 
@@ -77,6 +77,12 @@ class SRLoss(nn.Module):
             self.msssim = msssim
             self.l1 = nn.L1Loss()
             self.loss = self.msssim_l1
+        elif loss == 'ssim':
+            self.ssim = ssim
+            self.loss = self.ssim
+
+    def ssim(self, input, target):
+        return 1 - ssim(input, target)
 
     def msssim_l1(self, input, target):
         return self.alpha * (1 - self.msssim(input, target)) + (1 - self.alpha) * (self.l1(input, target))

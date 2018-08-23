@@ -16,13 +16,13 @@ from model import Generator, Discriminator, GANLoss, SRLoss
 parser = argparse.ArgumentParser(description='PyTorch Super Resolution Example')
 parser.add_argument('--save_path', type=str, default='model', help='model save path')
 parser.add_argument('--upscale_factor', type=int, default=3, help="super resolution upscale factor")
-parser.add_argument('--batch_size', type=int, default=24, help='training batch size')
+parser.add_argument('--batch_size', type=int, default=36, help='training batch size')
 parser.add_argument('--test_batch_size', type=int, default=6, help='testing batch size')
 parser.add_argument('--epochs', type=int, default=30, help='number of epochs to train for')
 parser.add_argument('--lr', type=float, default=0.0003, help='Learning Rate. Default=0.01')
 parser.add_argument('--cuda', action='store_true', help='use cuda?')
 parser.add_argument('--threads', type=int, default=32, help='number of threads for data loader to use')
-parser.add_argument('--gpuids', default=[1, 2, 3], nargs='+', help='GPU ID for using')
+parser.add_argument('--gpuids', default=[0, 1, 2, 3], nargs='+', help='GPU ID for using')
 parser.add_argument('--alpha', default=0.25, type=float, help='Loss alpha')
 opt = parser.parse_args()
 
@@ -47,7 +47,7 @@ discriminator = Discriminator()
 criterionGAN = GANLoss(alpha=opt.alpha)
 criterionL1 = nn.L1Loss()
 criterionMSE = nn.MSELoss()
-criterionMsssim_l1 = SRLoss(loss='msssim_l1', alpha=opt.alpha)
+# criterionSSIM = SRLoss(loss='ssim', alpha=opt.alpha)
 
 # set cuda(GPU)
 if use_cuda:
@@ -55,13 +55,15 @@ if use_cuda:
     criterionGAN = criterionGAN.cuda()
     criterionL1 = criterionL1.cuda()
     criterionMSE = criterionMSE.cuda()
-    criterionMsssim_l1 = criterionMsssim_l1.cuda()
+    # criterionMsssim_l1 = criterionSSIM.cuda()
     # set DataParallel to use multi gpu
     generator = nn.DataParallel(generator, device_ids=opt.gpuids, output_device=opt.gpuids[0]).cuda()
     discriminator = nn.DataParallel(discriminator, device_ids=opt.gpuids, output_device=opt.gpuids[0]).cuda()
 
 g_optim = optim.Adam(generator.parameters(), lr=opt.lr)
 d_optim = optim.Adam(discriminator.parameters(), lr=opt.lr)
+# g_optim = optim.RMSprop(generator.parameters(), lr=opt.lr)
+# d_optim = optim.RMSprop(discriminator.parameters(), lr=opt.lr)
 
 
 def train(epoch):
@@ -87,7 +89,9 @@ def train(epoch):
             target = target.cuda()
         target = target - input   # residual
 
-        ############# training D ##############
+        #######################################
+        # training D
+        #######################################
         d_optim.zero_grad()   # grad init
         gen_z = generator(input)    # gen SR image
 
@@ -104,17 +108,21 @@ def train(epoch):
 
         epoch_d_loss += loss_d
 
-        ############# training G ##############
+        #######################################
+        # training G
+        #######################################
         g_optim.zero_grad()   # grad init
         gen_z = generator(input)    # sr
         disc_z = discriminator(gen_z)
+        id_target = generator(target)
 
         # calculate loss
         loss_g_gan = criterionGAN(disc_z, True)
         loss_g_l1 = criterionL1(gen_z, target)
-        loss_msssim_l1 = criterionMsssim_l1(gen_z, target)
+        # loss_ssim = criterionSSIM(gen_z, target)
+        loss_id_l1 = criterionL1(id_target, target)
 
-        loss_g = (opt.alpha) * loss_g_gan + loss_g_l1 + loss_msssim_l1     # g loss
+        loss_g = loss_g_gan + loss_g_l1 + loss_id_l1    # g loss
         loss_g.backward()   # update grad
         g_optim.step()
 
@@ -174,7 +182,7 @@ def checkpoint(epoch, psnr):
             print("Failed to create directory!!!!!")
             raise
 
-    model_out_path = "{}/psnr_{:.4}_lr_{}_alpha_{}_epoch_{}.pth" \
+    model_out_path = "{}/psnr_{:.4f}_lr_{}_alpha_{:.2f}_epoch_{}.pth" \
                      .format(str(opt.save_path), psnr, opt.lr, opt.alpha, epoch)
     torch.save(generator.state_dict(), model_out_path)
     print("Checkpoint saved to {}".format(model_out_path))
