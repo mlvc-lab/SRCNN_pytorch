@@ -11,6 +11,9 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from data import get_training_set, get_test_set
 from model import SRCNN, Generator, init_weights, _NetG, SRLoss
+from torchvision import models
+import torch.utils.model_zoo as model_zoo
+
 
 parser = argparse.ArgumentParser(description='PyTorch Super Resolution Example')
 parser.add_argument("--step", type=int, default=10, help="Sets the learning rate to the initial LR decayed by momentum every n epochs, Default: n=10")
@@ -25,6 +28,7 @@ parser.add_argument("--momentum", default=0.9, type=float, help="Momentum, Defau
 parser.add_argument("--weight-decay", "--wd", default=1e-4, type=float, help="Weight decay, Default: 1e-4")
 parser.add_argument('--gpuids', default=[1,2,3], nargs='+',  help='GPU ID for using')
 parser.add_argument('--alpha', default=0.5, type=float, help='Loss alpha')
+parser.add_argument("--vgg_loss", action="store_true", help="Use content loss?")
 # parser.add_argument('--seed', type=int, default=123, help='random seed to use. Default=123')
 opt = parser.parse_args()
 
@@ -47,6 +51,23 @@ training_data_loader = DataLoader(dataset=train_set, num_workers=opt.threads, ba
 testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.test_batch_size, shuffle=False)
 
 
+if opt.vgg_loss:
+        print('===> Loading VGG model')
+        netVGG = models.vgg19()
+        netVGG.load_state_dict(model_zoo.load_url('https://download.pytorch.org/models/vgg19-dcbb9e9d.pth'))
+        class _content_model(nn.Module):
+            def __init__(self):
+                super(_content_model, self).__init__()
+                self.feature = nn.Sequential(*list(netVGG.features.children())[:-1])
+
+            def forward(self, x):
+                out = self.feature(x)
+                return out
+
+        netContent = _content_model()
+
+
+
 model = Generator()
 #srcnn = _NetG()
 criterion = nn.MSELoss()
@@ -57,6 +78,9 @@ if(use_cuda):
         model = model.cuda()
         criterion = criterion.cuda()
         model = nn.DataParallel(model, device_ids=opt.gpuids, output_device=opt.gpuids[0]).cuda()
+        if opt.vgg_loss:
+            netContent = netContent.cuda()
+
 
 #optimizer = optim.SGD(srcnn.parameters(),lr=opt.lr, momentum=0.9,weight_decay=0.001)
 optimizer = optim.Adam(model.parameters(),lr=opt.lr)
@@ -69,11 +93,26 @@ def train(epoch):
         if use_cuda:
             input = input.cuda()
             target = target.cuda()
+        
 
         optimizer.zero_grad()
         model_out = model(input)
+
+        if opt.vgg_loss:
+            content_input = netContent(model_out)
+            content_target = netContent(target)
+            content_target = content_target.detach()
+            content_loss = criterion(content_input, content_target)
+
+        if opt.vgg_loss:
+            netContent.zero_grad()
+            content_loss.backward(retain_graph=True)
+
         
         loss = criterion(model_out, target)
+
+
+
         epoch_loss = epoch_loss + loss.item()
         loss.backward()
        # nn.utils.clip_grad_norm(model.parameters(),0.25)

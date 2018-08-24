@@ -72,11 +72,11 @@ def init_weights(m):
         m.bias.data.fill_(0.01)
 
 class upsampleBlock(nn.Module):
-    def __init__(self, in_channels=64, out_channels=576):
+    def __init__(self, in_channels=128, out_channels=1152):
         super(upsampleBlock, self).__init__()
         self.conv = nn.Conv2d(in_channels, out_channels, 3, stride=1, padding=1)
         self.shuffler = nn.PixelShuffle(3)
-        self.prelu = nn.PReLU(64)
+        self.prelu = nn.PReLU(128)
     def forward(self, x):
         return self.prelu(self.shuffler(self.conv(x)))
 
@@ -89,14 +89,14 @@ class Generator(nn.Module):
         self.Prelu = nn.PReLU(init=0.2)
 
         self.layers = []
-        for i in range(8):
+        for i in range(4):
             self.layers.append(residualBlock())
         self.reallayers = nn.Sequential(*self.layers)
         
         self.inlayer = ConvBlock(128,128,kernel_size=3,padding=1)
         
         self.layers2=[]
-        for i in range(2):
+        for i in range(1):
             self.layers.append(upsampleBlock())
         self.reallayers2 = nn.Sequential(*self.layers2)
 
