@@ -3,6 +3,7 @@ import torch.utils.data as data
 from os import listdir
 from os.path import join
 from PIL import Image, ImageFilter
+from torchvision.transforms import RandomCrop
 
 
 def is_image_file(filename):
@@ -13,6 +14,7 @@ def load_img(filepath):
     img = Image.open(filepath).convert('YCbCr')
     return img
 
+
 class DatasetFromFolder(data.Dataset):
     def __init__(self, image_dir, input_transform=None, target_transform=None):
         super(DatasetFromFolder, self).__init__()
@@ -22,7 +24,7 @@ class DatasetFromFolder(data.Dataset):
         self.target_transform = target_transform
 
     def __getitem__(self, index):
-        input = load_img(self.image_filenames[index])
+        input = RandomCrop(300)(load_img(self.image_filenames[index]))
         target = input.copy()
         if self.input_transform:
             input = self.input_transform(input)
