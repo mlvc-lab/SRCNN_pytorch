@@ -9,15 +9,19 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 from torch.utils.data import DataLoader
+
+from skimage.measure import compare_ssim as ssim
+
 from data import get_training_set, get_test_set
 from model import Generator, Discriminator, GANLoss, SRLoss
+# from ms_ssim import SSIM
 
 # set option parameter
 parser = argparse.ArgumentParser(description='PyTorch Super Resolution Example')
 parser.add_argument('--save_path', type=str, default='model', help='model save path')
 parser.add_argument('--upscale_factor', type=int, default=3, help="super resolution upscale factor")
 parser.add_argument('--batch_size', type=int, default=32, help='training batch size')
-parser.add_argument('--test_batch_size', type=int, default=6, help='testing batch size')
+parser.add_argument('--test_batch_size', type=int, default=4, help='testing batch size')
 parser.add_argument('--epochs', type=int, default=50, help='number of epochs to train for')
 parser.add_argument('--lr', type=float, default=0.0001, help='Learning Rate. Default=0.01')
 parser.add_argument('--cuda', action='store_true', help='use cuda?')
@@ -47,7 +51,7 @@ discriminator = Discriminator()
 criterionGAN = GANLoss(alpha=opt.alpha)
 criterionL1 = nn.L1Loss()
 criterionMSE = nn.MSELoss()
-# criterionSSIM = SRLoss(loss='ssim', alpha=opt.alpha)
+# criterionSSIM = SSIM()
 
 # set cuda(GPU)
 if use_cuda:
@@ -55,7 +59,7 @@ if use_cuda:
     criterionGAN = criterionGAN.cuda()
     criterionL1 = criterionL1.cuda()
     criterionMSE = criterionMSE.cuda()
-    # criterionMsssim_l1 = criterionSSIM.cuda()
+    # criterionSSIM = criterionSSIM.cuda()
     # set DataParallel to use multi gpu
     generator = nn.DataParallel(generator, device_ids=opt.gpuids, output_device=opt.gpuids[0]).cuda()
     discriminator = nn.DataParallel(discriminator, device_ids=opt.gpuids, output_device=opt.gpuids[0]).cuda()
@@ -153,14 +157,21 @@ def test():
 
         prediction = generator(input)
         prediction = torch.add(prediction, 1, input)  # residual
+
+        # PSNR
         mse = nn.MSELoss()(prediction, target)
         psnr = 10 * log10(1 / mse.item())
-
         avg_psnr += psnr
-        # avg_ssim += ssim(target, prediction)
+
+        # SSIM
+        for i in range(opt.test_batch_size):
+            avg_ssim += ssim(target[i].permute(1, 2, 0).cpu().detach().numpy(),
+                             prediction[i].permute(1, 2, 0).cpu().detach().numpy(),
+                             multichannel=True)
+        # avg_ssim += criterionSSIM(target, prediction)
 
     avg_psnr /= len(testing_data_loader)
-    # avg_ssim /= len(testing_data_loader)
+    avg_ssim /= len(testing_data_loader)*opt.test_batch_size
 
     print("===> Avg. PSNR: {:.4f} dB, SSIM: {:.4f}".format(avg_psnr, avg_ssim))
 
