@@ -16,10 +16,10 @@ from model import Generator
 parser = argparse.ArgumentParser(description='PyTorch Super Res Example')
 parser.add_argument('--model', type=str, required=True, help='model file to use')
 parser.add_argument('--input_image', type=str, default='test.jpg', help='input image to use')
-parser.add_argument('--output_filename', default='test_out.jpg', type=str, help='where to save the output image')
+parser.add_argument('--output_filename', default='out.jpg', type=str, help='where to save the output image')
 parser.add_argument('--scale_factor', default=3, type=float, help='factor by which super resolution needed')
 parser.add_argument('--cuda', action='store_true', help='use cuda')
-parser.add_argument('--gpuids', default=[1,2,3], nargs='+', help='GPU ID for using')
+parser.add_argument('--gpuids', default=[0], nargs='+', help='GPU ID for using')
 opt = parser.parse_args()
 
 opt.gpuids = list(map(int, opt.gpuids))
