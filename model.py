@@ -10,13 +10,13 @@ class Generator(nn.Module):
     """
     Generate Super Resolution Image
     """
+
     def __init__(self, scale_factor=3):
         super(Generator, self).__init__()
 
         layers = [ConvBlock(3, 128, kernel_size=9, padding=4, activation='prelu')]
         for i in range(5):
             layers.append(BottleNeckBlock(128, activation='prelu'))
-        # layers.append(ConvBlock(128, scale_factor*scale_factor*15, kernel_size=1, padding=0, activation='prelu'))
         self.feature_ext = nn.Sequential(*layers)
 
         self.downsample = ConvBlock(3, 3, kernel_size=scale_factor, stride=scale_factor)
@@ -35,6 +35,7 @@ class Discriminator(nn.Module):
     """
     Discriminator to discriminate SR and LR
     """
+
     def __init__(self):
         super(Discriminator, self).__init__()
         self.activation = nn.ReLU()
@@ -64,6 +65,7 @@ class SRLoss(nn.Module):
     """
     Multi losses
     """
+
     def __init__(self, loss='l1_mse', alpha=0.25):
         super(SRLoss, self).__init__()
 
@@ -88,7 +90,7 @@ class SRLoss(nn.Module):
         return self.alpha * (1 - self.msssim(input, target)) + (1 - self.alpha) * (self.l1(input, target))
 
     def l1_mse(self, input, target):
-        return self.alpha * self.l1(input, target) + (1-self.alpha) * self.mse(input, target)
+        return self.alpha * self.l1(input, target) + (1 - self.alpha) * self.mse(input, target)
 
     def forward(self, input, target):
         return self.loss(input, target)

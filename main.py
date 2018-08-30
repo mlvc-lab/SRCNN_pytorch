@@ -14,6 +14,7 @@ from skimage.measure import compare_ssim as ssim
 
 from data import get_training_set, get_test_set
 from model import Generator, Discriminator, GANLoss, SRLoss
+
 # from ms_ssim import SSIM
 
 # set option parameter
@@ -59,13 +60,14 @@ if use_cuda:
     criterionGAN = criterionGAN.cuda()
     criterionL1 = criterionL1.cuda()
     criterionMSE = criterionMSE.cuda()
-    # criterionSSIM = criterionSSIM.cuda()
     # set DataParallel to use multi gpu
     generator = nn.DataParallel(generator, device_ids=opt.gpuids, output_device=opt.gpuids[0]).cuda()
     discriminator = nn.DataParallel(discriminator, device_ids=opt.gpuids, output_device=opt.gpuids[0]).cuda()
 
 g_optim = optim.Adam(generator.parameters(), lr=opt.lr)
 d_optim = optim.Adam(discriminator.parameters(), lr=opt.lr)
+
+
 # g_optim = optim.RMSprop(generator.parameters(), lr=opt.lr)
 # d_optim = optim.RMSprop(discriminator.parameters(), lr=opt.lr)
 
@@ -84,20 +86,20 @@ def train(epoch):
     epoch_g_loss = 0
 
     # batch iteration
-    for iteration, batch in enumerate(training_data_loader, 1):     # load training data from dataloader
+    for iteration, batch in enumerate(training_data_loader, 1):  # load training data from dataloader
 
         # set input and target data
         input, target = Variable(batch[0]), Variable(batch[1])
-        if use_cuda:    # gpu
+        if use_cuda:  # gpu
             input = input.cuda()
             target = target.cuda()
-        target = target - input   # residual
+        target = target - input  # residual
 
         #######################################
         # training D
         #######################################
-        d_optim.zero_grad()   # grad init
-        gen_z = generator(input)    # gen SR image
+        d_optim.zero_grad()  # grad init
+        gen_z = generator(input)  # gen SR image
 
         disc_z = discriminator(gen_z.detach())  # disc result of fake image
         fake_loss = criterionGAN(disc_z, False)  # gan fake loss
@@ -107,7 +109,7 @@ def train(epoch):
 
         loss_d = fake_loss + real_loss
 
-        loss_d.backward()   # update grad
+        loss_d.backward()  # update grad
         d_optim.step()
 
         epoch_d_loss += loss_d
@@ -115,8 +117,8 @@ def train(epoch):
         #######################################
         # training G
         #######################################
-        g_optim.zero_grad()   # grad init
-        gen_z = generator(input)    # sr
+        g_optim.zero_grad()  # grad init
+        gen_z = generator(input)  # sr
         disc_z = discriminator(gen_z)
         id_target = generator(target)
 
@@ -126,8 +128,8 @@ def train(epoch):
         # loss_ssim = criterionSSIM(gen_z, target)
         loss_id_l1 = criterionL1(id_target, target)
 
-        loss_g = loss_g_gan + loss_g_l1 + loss_id_l1    # g loss
-        loss_g.backward()   # update grad
+        loss_g = loss_g_gan + loss_g_l1 + loss_id_l1  # g loss
+        loss_g.backward()  # update grad
         g_optim.step()
 
         epoch_g_loss = loss_g
@@ -171,7 +173,7 @@ def test():
         # avg_ssim += criterionSSIM(target, prediction)
 
     avg_psnr /= len(testing_data_loader)
-    avg_ssim /= len(testing_data_loader)*opt.test_batch_size
+    avg_ssim /= len(testing_data_loader) * opt.test_batch_size
 
     print("===> Avg. PSNR: {:.4f} dB, SSIM: {:.4f}".format(avg_psnr, avg_ssim))
 
@@ -194,7 +196,7 @@ def checkpoint(epoch, psnr):
             raise
 
     model_out_path = "{}/psnr_{:.4f}_lr_{}_alpha_{:.2f}_epoch_{}.pth" \
-                     .format(str(opt.save_path), psnr, opt.lr, opt.alpha, epoch)
+        .format(str(opt.save_path), psnr, opt.lr, opt.alpha, epoch)
     torch.save(generator.state_dict(), model_out_path)
     print("Checkpoint saved to {}".format(model_out_path))
 
@@ -237,10 +239,9 @@ def repeate_check(lrs=(0.0003, 0.0001), alphas=(0.2, 0.3), result_file='result.t
             print(opt)
             avg_psnr += main()
 
-            f.write("lr:{:.5}\talpha:{:.2}\tPSNR:{:.4}".format(lr, alpha, avg_psnr/5))
+            f.write("lr:{:.5}\talpha:{:.2}\tPSNR:{:.4}".format(lr, alpha, avg_psnr / 5))
     f.close()
 
 
 if __name__ == '__main__':
-
     main()
